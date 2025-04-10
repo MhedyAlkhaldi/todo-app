@@ -17,7 +17,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = secrets.token_hex(32)
 csrf = CSRFProtect(app)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('task_management')
 print("🔗 DATABASE_URL:", os.environ.get('DATABASE_URL'))
 
 db = SQLAlchemy(app)
