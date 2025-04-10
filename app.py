@@ -9,7 +9,7 @@ from datetime import datetime
 
 from datetime import date
 import os
-
+from flask_migrate import upgrade
 
 
 
@@ -18,7 +18,12 @@ app.config['SECRET_KEY'] = secrets.token_hex(32)
 csrf = CSRFProtect(app)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
-print("🔗 DATABASE_URL:", os.environ.get('DATABASE_URL'))
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+if __name__ == "__main__":
+    app.run(debug=True)
+
+upgrade()
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
