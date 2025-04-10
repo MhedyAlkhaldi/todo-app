@@ -2,16 +2,62 @@ from flask_wtf.csrf import CSRFProtect
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime, date
 from flask_migrate import Migrate
 import secrets
-from datetime import datetime
-
-from datetime import date
 import os
-from flask_migrate import upgrade
 import urllib.parse
 from urllib.parse import quote_plus
+
+# تهيئة التطبيق
+app = Flask(__name__)
+
+# إعدادات الأمان
+app.config['SECRET_KEY'] = secrets.token_hex(32)
+csrf = CSRFProtect(app)
+
+# 1. إعداد اتصال قاعدة البيانات (الطريقة الآمنة)
+def get_database_uri():
+    # الأولوية لمتغير البيئة في Render
+    if 'DATABASE_URL' in os.environ:
+        uri = os.environ['DATABASE_URL']
+    else:
+        # للتنمية المحلية فقط (لا تستخدم في الإنتاج)
+        password = "C_FKf4_uN.2fwH-"  # استبدلها بمتغير بيئة في الإنتاج
+        encoded_password = quote_plus(password)
+        uri = f"postgresql://postgres:{encoded_password}@db.zidmmheurkweuwoasrfg.supabase.co:5432/task_management"
+
+    # معالجة الرابط
+    if uri.startswith("postgres://"):
+        uri = uri.replace("postgres://", "postgresql://", 1)
+    
+    # إضافة SSL لـ Supabase
+    if "supabase.co" in uri:
+        if '?' in uri:
+            uri += "&sslmode=require"
+        else:
+            uri += "?sslmode=require"
+    
+    return uri
+
+# 2. تطبيق إعدادات قاعدة البيانات
+app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+    'pool_timeout': 30,
+    'pool_size': 20,
+    'max_overflow': 10
+}
+
+# 3. تهيئة الإضافات
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
+
 
 # تهيئة التطبيق
 app = Flask(__name__)
