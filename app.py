@@ -15,6 +15,14 @@ import urllib.parse
 
 # تهيئة التطبيق
 app = Flask(__name__)
+password = "C_FKf4_uN.2fwH-"
+encoded_password = quote_plus(password)  # ترميز الأحرف الخاصة
+
+app.config['SQLALCHEMY_DATABASE_URI'] = (
+    f"postgresql://postgres:{encoded_password}@"
+    f"db.zidmmheurkweuwoasrfg.supabase.co:5432/"
+    f"task_management?sslmode=require"
+)
 app.config['SECRET_KEY'] = secrets.token_hex(32)
 csrf = CSRFProtect(app)
 
