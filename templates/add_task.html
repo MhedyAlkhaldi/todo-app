@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إضافة مهمة جديدة</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Tahoma', Arial, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .navbar {
+            box-shadow: 0 2px 4px rgba(0,0,0,.1);
+        }
+        .form-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,.1);
+            padding: 25px;
+            margin-top: 30px;
+        }
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+        .badge-pending {
+            background-color: #ffeeba;
+            color: #856404;
+        }
+        .badge-in-progress {
+            background-color: #bee5eb;
+            color: #0c5460;
+        }
+        .badge-completed {
+            background-color: #c3e6cb;
+            color: #155724;
+        }
+        .badge-postponed {
+            background-color: #d6d8db;
+            color: #383d41;
+        }
+        .badge-cancelled {
+            background-color: #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+
+<!-- شريط التنقل -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <i class="bi bi-speedometer2"></i> نظام إدارة المهام
+    </a>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="/dashboard"><i class="bi bi-list-task"></i> لوحة المهام</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link active" href="/add_task"><i class="bi bi-plus-circle"></i> إضافة مهمة</a>
+        </li>
+      </ul>
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          <span class="nav-link"><i class="bi bi-person-circle"></i> {{ current_user.name }}</span>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/logout"><i class="bi bi-box-arrow-left"></i> تسجيل الخروج</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- عرض الرسائل -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show mt-3">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="form-container">
+                <h2 class="mb-4 text-center">
+                    <i class="bi bi-plus-circle"></i> إضافة مهمة جديدة
+                </h2>
+                
+                <form method="POST" action="{{ url_for('add_task') }}">
+                    <!-- معلومات المهمة -->
+                    <div class="mb-4">
+                        <h5 class="border-bottom pb-2">معلومات المهمة</h5>
+                        <div class="mb-3">
+                            <label for="task_name" class="form-label">اسم المهمة <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="task_name" name="task_name" required>
+                        </div>
+                    </div>
+
+                    <!-- معلومات الموظف والقسم -->
+                    <div class="mb-4">
+                        <h5 class="border-bottom pb-2">معلومات التنفيذ</h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="employee_name" class="form-label">الموظف</label>
+                                <input type="text" class="form-control" value="{{ current_user.name }}" readonly>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="department" class="form-label">القسم</label>
+                                <input type="text" class="form-control" value="{{ current_user.department.name }}" readonly>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- حالة المهمة وتاريخها -->
+                    <div class="mb-4">
+                        <h5 class="border-bottom pb-2">حالة المهمة</h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="status" class="form-label">الحالة <span class="text-danger">*</span></label>
+                                <select class="form-select" id="status" name="status" required>
+                                    <option value="قيد التنفيذ">
+                                        <span class="status-badge badge-pending">قيد التنفيذ</span>
+                                    </option>
+                                    <option value="جاري العمل">
+                                        <span class="status-badge badge-in-progress">جاري العمل</span>
+                                    </option>
+                                    <option value="مكتمل">
+                                        <span class="status-badge badge-completed">مكتمل</span>
+                                    </option>
+                                    <option value="مؤجل">
+                                        <span class="status-badge badge-postponed">مؤجل</span>
+                                    </option>
+                                    <option value="ملغى">
+                                        <span class="status-badge badge-cancelled">ملغى</span>
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="date" class="form-label">تاريخ التسليم <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" id="date" name="date" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ملاحظات إضافية -->
+                    <div class="mb-4">
+                        <h5 class="border-bottom pb-2">تفاصيل إضافية</h5>
+                        <div class="mb-3">
+                            <label for="description" class="form-label">وصف المهمة</label>
+                            <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- أزرار التحكم -->
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="/dashboard" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-right"></i> رجوع
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> حفظ المهمة
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // تعيين تاريخ اليوم كقيمة افتراضية
+    document.addEventListener('DOMContentLoaded', function() {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('date').value = today;
+        
+        // إضافة تأثيرات للخيارات في القائمة المنسدلة
+        const statusSelect = document.getElementById('status');
+        statusSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            // يمكنك إضافة أي تأثيرات إضافية هنا
+        });
+    });
+</script>
+
+</body>
+</html>
