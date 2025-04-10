@@ -14,21 +14,33 @@ from flask_migrate import upgrade
 
 
 app = Flask(__name__)
+
+# إعداد المفتاح السري
 app.config['SECRET_KEY'] = secrets.token_hex(32)
+
+# تفعيل CSRF حماية
 csrf = CSRFProtect(app)
 
+# إعداد قاعدة البيانات
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
-if __name__ == "__main__":
-    app.run(debug=True)
 
-upgrade()
-
+# تفعيل SQLAlchemy و Migrate
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
+# إعداد تسجيل الدخول
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+
+# تأكد من أن الوظائف تعمل ضمن سياق التطبيق
+with app.app_context():
+    # جميع العمليات التي تحتاج إلى قاعدة البيانات أو سياق التطبيق
+    pass
+
+# إعداد التطبيق للعمل في الوضع المحلي
+if __name__ == "__main__":
+    app.run(debug=True)
 
 # موديلات قاعدة البيانات
 class Department(db.Model):
