@@ -10,61 +10,26 @@ from datetime import datetime
 from datetime import date
 import os
 from flask_migrate import upgrade
-from flask_wtf.csrf import CSRFProtect
 
+
+
+# تهيئة التطبيق
+app = Flask(__name__)
+app.config['SECRET_KEY'] = secrets.token_hex(32)
+csrf = CSRFProtect(app)
+
+# إعداد قاعدة البيانات
+uri = os.environ.get('DATABASE_URL')
+if uri and uri.startswith("postgres://"):
+    uri = uri.replace("postgres://", "postgresql://", 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = uri
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # تهيئة الإضافات
-db = SQLAlchemy()
-migrate = Migrate()
-login_manager = LoginManager()
-csrf = CSRFProtect()
-
-def create_app():
-    # إنشاء تطبيق Flask
-    app = Flask(__name__)
-    
-    # إعداد المفتاح السري
-    app.config['SECRET_KEY'] = secrets.token_hex(32)
-    
-    # إعداد قاعدة البيانات مع إصلاح رابط PostgreSQL لـ Render
-    uri = os.environ.get('DATABASE_URL')
-    if uri and uri.startswith("postgres://"):
-        uri = uri.replace("postgres://", "postgresql://", 1)
-    app.config['SQLALCHEMY_DATABASE_URI'] = uri
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    
-    # تهيئة الإضافات مع التطبيق
-    db.init_app(app)
-    migrate.init_app(app, db)
-    login_manager.init_app(app)
-    csrf.init_app(app)
-    
-    # إعداد تسجيل الدخول
-    login_manager.login_view = 'auth.login'
-    
-    # تسجيل البلوبيرنتات
-    from .auth import auth as auth_blueprint
-    app.register_blueprint(auth_blueprint)
-    
-    from .main import main as main_blueprint
-    app.register_blueprint(main_blueprint)
-    
-    # إنشاء جداول قاعدة البيانات
-    with app.app_context():
-        db.create_all()
-    
-    return app
-
-# إنشاء التطبيق
-app = create_app()
-
-# تشغيل التطبيق في الوضع المحلي فقط
-if __name__ == '__main__':
-    app.run(debug=True)
-    
-    
-    
-    
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
 
 # موديلات قاعدة البيانات
 class Department(db.Model):
