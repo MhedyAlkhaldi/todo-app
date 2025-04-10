@@ -11,7 +11,7 @@ from datetime import date
 import os
 from flask_migrate import upgrade
 import urllib.parse
-
+from urllib.parse import quote_plus
 
 # تهيئة التطبيق
 app = Flask(__name__)
