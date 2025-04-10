@@ -10,37 +10,61 @@ from datetime import datetime
 from datetime import date
 import os
 from flask_migrate import upgrade
+from flask_wtf.csrf import CSRFProtect
 
 
+# تهيئة الإضافات
+db = SQLAlchemy()
+migrate = Migrate()
+login_manager = LoginManager()
+csrf = CSRFProtect()
 
-app = Flask(__name__)
+def create_app():
+    # إنشاء تطبيق Flask
+    app = Flask(__name__)
+    
+    # إعداد المفتاح السري
+    app.config['SECRET_KEY'] = secrets.token_hex(32)
+    
+    # إعداد قاعدة البيانات مع إصلاح رابط PostgreSQL لـ Render
+    uri = os.environ.get('DATABASE_URL')
+    if uri and uri.startswith("postgres://"):
+        uri = uri.replace("postgres://", "postgresql://", 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = uri
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    
+    # تهيئة الإضافات مع التطبيق
+    db.init_app(app)
+    migrate.init_app(app, db)
+    login_manager.init_app(app)
+    csrf.init_app(app)
+    
+    # إعداد تسجيل الدخول
+    login_manager.login_view = 'auth.login'
+    
+    # تسجيل البلوبيرنتات
+    from .auth import auth as auth_blueprint
+    app.register_blueprint(auth_blueprint)
+    
+    from .main import main as main_blueprint
+    app.register_blueprint(main_blueprint)
+    
+    # إنشاء جداول قاعدة البيانات
+    with app.app_context():
+        db.create_all()
+    
+    return app
 
-# إعداد المفتاح السري
-app.config['SECRET_KEY'] = secrets.token_hex(32)
+# إنشاء التطبيق
+app = create_app()
 
-# تفعيل CSRF حماية
-csrf = CSRFProtect(app)
-
-# إعداد قاعدة البيانات
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# تفعيل SQLAlchemy و Migrate
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
-
-# إعداد تسجيل الدخول
-login_manager = LoginManager(app)
-login_manager.login_view = 'login'
-
-# تأكد من أن الوظائف تعمل ضمن سياق التطبيق
-with app.app_context():
-    # جميع العمليات التي تحتاج إلى قاعدة البيانات أو سياق التطبيق
-    pass
-
-# إعداد التطبيق للعمل في الوضع المحلي
-if __name__ == "__main__":
+# تشغيل التطبيق في الوضع المحلي فقط
+if __name__ == '__main__':
     app.run(debug=True)
+    
+    
+    
+    
 
 # موديلات قاعدة البيانات
 class Department(db.Model):
