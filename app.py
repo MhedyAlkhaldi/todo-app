@@ -8,13 +8,16 @@ import secrets
 from datetime import datetime
 
 from datetime import date
+import os
+
+
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = secrets.token_hex(32)
 csrf = CSRFProtect(app)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:2525@localhost/task_management'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
