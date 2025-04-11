@@ -10,97 +10,34 @@ import os
 import urllib.parse
 from urllib.parse import quote_plus
 
-# تهيئة التطبيق
+# إنشاء التطبيق
 app = Flask(__name__)
 
 # إعدادات الأمان
 app.config['SECRET_KEY'] = secrets.token_hex(32)
 csrf = CSRFProtect(app)
 
-# 1. إعداد اتصال قاعدة البيانات (الطريقة الآمنة)
-def get_database_uri():
-    # الأولوية لمتغير البيئة في Render
-    if 'DATABASE_URL' in os.environ:
-        uri = os.environ['DATABASE_URL']
-    else:
-        # للتنمية المحلية فقط (لا تستخدم في الإنتاج)
-        password = "C_FKf4_uN.2fwH-"  # استبدلها بمتغير بيئة في الإنتاج
-        encoded_password = quote_plus(password)
-        uri = f"postgresql://postgres:{encoded_password}@db.zidmmheurkweuwoasrfg.supabase.co:5432/task_management"
 
-    # معالجة الرابط
-    if uri.startswith("postgres://"):
-        uri = uri.replace("postgres://", "postgresql://", 1)
-    
-    # إضافة SSL لـ Supabase
-    if "supabase.co" in uri:
-        if '?' in uri:
-            uri += "&sslmode=require"
-        else:
-            uri += "?sslmode=require"
-    
-    return uri
+# إعداد قاعدة البيانات من متغير البيئة
+uri = os.environ.get('DATABASE_URL')
 
-# 2. تطبيق إعدادات قاعدة البيانات
-app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
+# تعديل الرابط إذا كان بصيغة postgres://
+if uri and uri.startswith("postgres://"):
+    uri = uri.replace("postgres://", "postgresql://", 1)
+
+# إعدادات SQLAlchemy
+app.config['SQLALCHEMY_DATABASE_URI'] = uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_pre_ping': True,
-    'pool_recycle': 300,
-    'pool_timeout': 30,
-    'pool_size': 20,
-    'max_overflow': 10
-}
 
-# 3. تهيئة الإضافات
+# تهيئة الإضافات
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-
-# تهيئة التطبيق
-app = Flask(__name__)
-password = "C_FKf4_uN.2fwH-"
-encoded_password = quote_plus(password)  # ترميز الأحرف الخاصة
-
-app.config['SQLALCHEMY_DATABASE_URI'] = (
-    f"postgresql://postgres:{encoded_password}@"
-    f"db.zidmmheurkweuwoasrfg.supabase.co:5432/"
-    f"task_management?sslmode=require"
-)
-app.config['SECRET_KEY'] = secrets.token_hex(32)
-csrf = CSRFProtect(app)
-
-# إعداد اتصال قاعدة البيانات مع معالجة خاصة لـ Supabase
-def get_database_uri():
-    uri = os.environ.get('DATABASE_URL')
-    
-    if uri and uri.startswith("postgres://"):
-        # تحويل لصيغة SQLAlchemy
-        uri = uri.replace("postgres://", "postgresql://", 1)
-        
-        # إذا كنت تستخدم Supabase، قد تحتاج لإضافة خيارات SSL
-        if "supabase.co" in uri:
-            parsed = urllib.parse.urlparse(uri)
-            query = urllib.parse.parse_qs(parsed.query)
-            query['sslmode'] = 'require'
-            new_query = urllib.parse.urlencode(query, doseq=True)
-            uri = urllib.parse.urlunparse(parsed._replace(query=new_query))
-    
-    return uri
-
-app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_pre_ping': True,  # يساعد في اكتشاف الاتصالات المنقطعة
-    'pool_recycle': 300,    # إعادة إنشاء الاتصال كل 5 دقائق
-}
-
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
-login_manager = LoginManager(app)
-login_manager.login_view = 'login'
+# فقط لتشغيل التطبيق محليًا
+if __name__ == '__main__':
+    app.run(debug=True)
 
 # موديلات قاعدة البيانات
 class Department(db.Model):
