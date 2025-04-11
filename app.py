@@ -162,6 +162,11 @@ def login():
 
         if user and user.password == password:
             login_user(user)
+
+            # 🟢 هون أضفنا تخزين الاسم والصلاحية بالسشن
+            session['username'] = user.username
+            session['role'] = user.role
+
             if user.role == 'admin':
                 flash(f"تم التسجيل كمدير {user.name}", "success")
             else:
@@ -171,6 +176,7 @@ def login():
             flash("اسم المستخدم أو كلمة المرور غير صحيحة", "danger")
     
     return render_template('login.html')
+
 
 
 @app.route('/logout')
@@ -339,7 +345,9 @@ def archived_tasks():
 
     # فلترة حسب الصلاحيات
     if session.get('role') != 'manager':  # الموظف فقط يشوف أرشيفه
-        query = query.filter_by(employee_name=session['username'])
+        username = session.get('username')
+    if session.get('role') != 'manager' and username:
+        query = query.filter_by(employee_name=username)
 
     if selected_department:
         query = query.filter_by(department_id=selected_department)
