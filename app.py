@@ -347,12 +347,12 @@ def archived_tasks():
     if session.get('role') != 'manager':  # الموظف فقط يشوف أرشيفه
         username = session.get('username')
     if session.get('role') != 'manager' and username:
-        query = query.filter_by(employee_name=username)
+        query = query.filter_by(employee_id=username)
 
     if selected_department:
         query = query.filter_by(department_id=selected_department)
     if selected_employee:
-        query = query.filter_by(employee_name=selected_employee)
+        query = query.filter_by(employee_id=selected_employee)
     if selected_week:
         year, week = map(int, selected_week.split("-W"))
         start_date = date.fromisocalendar(year, week, 1)
