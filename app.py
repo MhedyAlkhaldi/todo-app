@@ -1,5 +1,5 @@
 from flask_wtf.csrf import CSRFProtect
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -10,35 +10,51 @@ import os
 import urllib.parse
 from urllib.parse import quote_plus
 
-# إنشاء التطبيق
+# تهيئة التطبيق
 app = Flask(__name__)
 
 # إعدادات الأمان
 app.config['SECRET_KEY'] = secrets.token_hex(32)
 csrf = CSRFProtect(app)
 
+# إعداد الاتصال بقاعدة البيانات
+def get_database_uri():
+    uri = os.getenv('DATABASE_URL')  # استخدام متغير البيئة إذا موجود
+    if uri:
+        # التأكد من أن الرابط في الصيغة الصحيحة
+        if uri.startswith("postgres://"):
+            uri = uri.replace("postgres://", "postgresql://", 1)
+        
+        # إذا كنت تستخدم Railway أو Supabase، تأكد من إضافة SSL
+        if "railway" in uri or "supabase" in uri:
+            if '?' in uri:
+                uri += "&sslmode=require"
+            else:
+                uri += "?sslmode=require"
+    else:
+        # إذا لم يوجد متغير البيئة، استخدم الرابط المحلي
+        password = "YOUR_PASSWORD"  # استبدل بكلمة المرور الخاصة بك
+        encoded_password = quote_plus(password)
+        uri = f"postgresql://postgres:{encoded_password}@your-db-host:5432/your-database?sslmode=require"
+    
+    return uri
 
-# إعداد قاعدة البيانات من متغير البيئة
-uri = os.environ.get('DATABASE_URL')
-
-# تعديل الرابط إذا كان بصيغة postgres://
-if uri and uri.startswith("postgres://"):
-    uri = uri.replace("postgres://", "postgresql://", 1)
-
-# إعدادات SQLAlchemy
-app.config['SQLALCHEMY_DATABASE_URI'] = uri
+# إعدادات قاعدة البيانات
+app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# تهيئة الإضافات
+# تهيئة SQLAlchemy و Migrate
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
+# تهيئة LoginManager
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# فقط لتشغيل التطبيق محليًا
-if __name__ == '__main__':
-    app.run(debug=True)
+# الآن يمكنك استيراد نماذج قاعدة البيانات والقيام بمزيد من التهيئة هنا
 
+if __name__ == "__main__":
+    app.run(debug=True)
 # موديلات قاعدة البيانات
 class Department(db.Model):
     __tablename__ = 'department'
@@ -315,18 +331,20 @@ def archived_tasks():
     departments = Department.query.all()
     employees = Employee.query.all()
 
-    # فلاتر
     selected_department = request.args.get('department')
     selected_employee = request.args.get('employee')
-    selected_week = request.args.get('week')  # توقيت بصيغة YYYY-WW
+    selected_week = request.args.get('week')  # بصيغة YYYY-WW
 
-    # استعلام المهام المؤرشفة
     query = ArchivedTask.query
+
+    # فلترة حسب الصلاحيات
+    if session.get('role') != 'manager':  # الموظف فقط يشوف أرشيفه
+        query = query.filter_by(employee_name=session['username'])
 
     if selected_department:
         query = query.filter_by(department_id=selected_department)
     if selected_employee:
-        query = query.filter_by(employee_id=selected_employee)
+        query = query.filter_by(employee_name=selected_employee)
     if selected_week:
         year, week = map(int, selected_week.split("-W"))
         start_date = date.fromisocalendar(year, week, 1)
@@ -336,6 +354,7 @@ def archived_tasks():
     tasks = query.order_by(ArchivedTask.date.desc()).all()
 
     return render_template('archived_tasks.html', tasks=tasks, departments=departments, employees=employees)
+
 
 
 

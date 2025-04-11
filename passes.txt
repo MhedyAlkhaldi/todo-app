@@ -1,0 +1,21 @@
+C_FKf4_uN.2fwH-
+
+
+
+postgresql://postgres:C_FKf4_uN.2fwH-@db.zidmmheurkweuwoasrfg.supabase.co:5432/postgres
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:C_FKf4_uN.2fwH-@db.zidmmheurkweuwoasrfg.supabase.co:5432/postgres'
+
+postgresql://postgres:C_FKf4_uN.2fwH-@db.zidmmheurkweuwoasrfg.supabase.co:5432/task_management
+
+
+
+طريقة push على ريندر
+
+git add .
+git commit -m "Fix database URI to use environment variable"
+git push
+
+C_FKf4_uN.2fwH-
+
+railway: gZAqNHnNEHRbrRDZQLoQqrGFLNKjWEHF
