@@ -91,6 +91,7 @@ class ArchivedTask(db.Model):
     original_task_id = db.Column(db.Integer)
     task_name = db.Column(db.String(100))
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'))
+    employee = db.relationship('Employee', backref='archived_tasks')  # 👈 هذا السطر الجديد
     department_id = db.Column(db.Integer, db.ForeignKey('department.id'))
     department = db.relationship('Department', backref='archived_tasks')
     status = db.Column(db.String(20))
@@ -347,7 +348,8 @@ def archived_tasks():
     if session.get('role') != 'manager':  # الموظف فقط يشوف أرشيفه
         username = session.get('username')
     if session.get('role') != 'manager' and username:
-        query = query.filter_by(employee_id=username)
+        query = query.join(Employee).filter(Employee.username == session['username'])
+
 
     if selected_department:
         query = query.filter_by(department_id=selected_department)
