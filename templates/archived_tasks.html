@@ -127,8 +127,7 @@
     </h2>
 
     <div class="filter-section">
-        <form id="filter_form" method="GET" action="/archived_tasks">
-
+        <form id="filter_form" method="GET" action="/dashboard">
             <div class="row g-3">
                 {% if is_admin %}
                 <div class="col-md-3">
@@ -149,20 +148,7 @@
                     <input type="date" class="form-control" id="date_filter" name="date_filter" 
                            value="{{ date_filter }}" onchange="applyFilters()">
                 </div>
-                <div class="col-md-3">
-                    <label for="employee_filter" class="form-label">فلتر الموظفين</label>
-                    <select class="form-select" id="employee_filter" name="employee_filter" onchange="applyFilters()">
-                        <option value="">جميع الموظفين</option>
-                        {% for emp in all_employees %}
-                        <option value="{{ emp.id }}" {% if employee_filter == emp.id|string %}selected{% endif %}>
-                            {{ emp.name }} - {{ emp.department.name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-
-                    
+                
                 <div class="col-md-3">
                     <label for="status_filter" class="form-label">فلتر الحالة</label>
                     <select class="form-select" id="status_filter" name="status_filter" onchange="applyFilters()">
