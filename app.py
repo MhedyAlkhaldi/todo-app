@@ -350,9 +350,9 @@ def archived_tasks():
     query = ArchivedTask.query
 
     # فلترة حسب الصلاحيات
-    if session.get('role') != 'manager':  # الموظف فقط يشوف أرشيفه
+    if session.get('role') != 'admin':  # الموظف فقط يشوف أرشيفه
         username = session.get('username')
-    if session.get('role') != 'manager' and username:
+    if session.get('role') != 'admin' and username:
         query = query.join(Employee).filter(Employee.username == session['username'])
 
 
