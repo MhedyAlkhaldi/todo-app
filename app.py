@@ -340,50 +340,40 @@ def run_archive():
 @app.route('/archived_tasks', methods=['GET', 'POST'])
 @login_required
 def archived_tasks():
-    # صلاحيات الوصول
-    departments = current_user.role == "admin"
-    employees = Employee.query.all()
+    # جلب جميع الأقسام إذا كان مديراً
+    departments = Department.query.all() if is_admin() else None
+    employees = Employee.query.all() if is_admin() else None
 
     selected_department = request.args.get('department')
     selected_employee = request.args.get('employee')
     selected_week = request.args.get('week')  # بصيغة YYYY-WW
-    status_filter = request.args.get('status_filter')  # فلتر الحالة
 
-    # الاستعلام الأساسي
     query = ArchivedTask.query
 
-    # فلترة حسب الصلاحيات (إذا لم يكن المستخدم Admin، يظهر المهام الخاصة به فقط)
-    if session.get('role') != 'admin':  # الموظف فقط يشوف أرشيفه
-        username = session.get('username')
-        if username:
-            query = query.join(Employee).filter(Employee.username == session['username'])
+    # فلترة حسب الصلاحيات
+    if not is_admin():
+        query = query.filter_by(employee_id=current_user.id)
 
-    # فلترة حسب القسم
     if selected_department:
         query = query.filter_by(department_id=selected_department)
-
-    # فلترة حسب الموظف
     if selected_employee:
         query = query.filter_by(employee_id=selected_employee)
-
-    # فلترة حسب الأسبوع
     if selected_week:
-        year, week = map(int, selected_week.split("-W"))
-        start_date = date.fromisocalendar(year, week, 1)
-        end_date = date.fromisocalendar(year, week, 7)
-        query = query.filter(ArchivedTask.date >= start_date, ArchivedTask.date <= end_date)
+        try:
+            year, week = map(int, selected_week.split("-W"))
+            start_date = date.fromisocalendar(year, week, 1)
+            end_date = date.fromisocalendar(year, week, 7)
+            query = query.filter(ArchivedTask.date >= start_date, ArchivedTask.date <= end_date)
+        except ValueError:
+            flash("صيغة الأسبوع غير صحيحة", "danger")
 
-    # فلترة حسب الحالة
-    if status_filter:
-        query = query.filter(ArchivedTask.status == status_filter)
-
-    # جلب المهام
     tasks = query.order_by(ArchivedTask.date.desc()).all()
 
-    return render_template('archived_tasks.html', tasks=tasks, departments=departments, employees=employees,
-                           selected_department=selected_department, selected_employee=selected_employee,
-                           selected_week=selected_week, status_filter=status_filter)
-
+    return render_template('archived_tasks.html', 
+                         tasks=tasks, 
+                         departments=departments, 
+                         employees=employees,
+                         is_admin=is_admin())
 
 
 
