@@ -128,13 +128,13 @@
 
     <div class="filter-section">
         <form id="filter_form" method="GET" action="/archived_tasks">
-            <div class="col-md-3">
+            <div class="row g-3">
                 {% if is_admin %}
                 <div class="col-md-3">
                     <label for="employee_filter" class="form-label">فلتر الموظفين</label>
                     <select class="form-select" id="employee_filter" name="employee" onchange="applyFilters()">
                         <option value="">جميع الموظفين</option>
-                        {% for emp in employees %}
+                        {% for emp in employee %}
                         <option value="{{ emp.id }}" {% if employee_filter == emp.id|string %}selected{% endif %}>
                             {{ emp.name }} - {{ emp.department.name }}
                         </option>
