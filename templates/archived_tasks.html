@@ -257,11 +257,11 @@
             if (value) params.append(filter, value);
         });
         
-        window.location.href = `/dashboard?${params.toString()}`;
+        window.location.href = `/archived_tasks?${params.toString()}`;
     }
 
     function resetFilters() {
-        window.location.href = '/dashboard';
+        window.location.href = '/archived_tasks';
     }
 
     // تفعيل أدوات التلميح للملاحظات
