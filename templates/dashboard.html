@@ -77,11 +77,13 @@
         </li>
         <li class="nav-item">
             <a class="nav-link" href="/archived_tasks"><i class="bi bi-archive"></i> أرشيف المهام</a>
-          </li>
-          
-          
-        
-      </ul>
+        </li>
+        {% if is_admin %}
+        <li class="nav-item">
+          <a class="nav-link" href="/admin"><i class="bi bi-person-gear"></i> لوحة المدير</a>
+        </li>
+        {% endif %}   
+        </ul>
       <ul class="navbar-nav">
         <li class="nav-item">
           <a class="nav-link" href="/add_task"><i class="bi bi-plus-circle"></i> إضافة مهمة</a>
