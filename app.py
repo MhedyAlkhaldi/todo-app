@@ -9,7 +9,7 @@ import secrets
 import os
 import urllib.parse
 from urllib.parse import quote_plus
-from flask_wtf.csrf import CSRFProtect
+
 
 
 # تهيئة التطبيق
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     app.run(debug=True)
     
     
-    csrf = CSRFProtect(app)
+   
 
 # موديلات قاعدة البيانات
 class Department(db.Model):
