@@ -98,6 +98,7 @@
                 </h2>
                 
                 <form method="POST" action="{{ url_for('add_task') }}">
+                    {{ form.hidden_tag() }}
                     <!-- معلومات المهمة -->
                     <div class="mb-4">
                         <h5 class="border-bottom pb-2">معلومات المهمة</h5>
