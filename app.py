@@ -55,8 +55,7 @@ login_manager.login_view = 'login'
 
 # الآن يمكنك استيراد نماذج قاعدة البيانات والقيام بمزيد من التهيئة هنا
 
-if __name__ == "__main__":
-    app.run(debug=True)
+
     
     
    
@@ -341,7 +340,7 @@ def run_archive():
 @app.route('/archived_tasks', methods=['GET', 'POST'])
 @login_required
 def archived_tasks():
-    departments = Department.query.all()
+    departments = current_user.role == "admin"
     employees = Employee.query.all()
 
     selected_department = request.args.get('department')
