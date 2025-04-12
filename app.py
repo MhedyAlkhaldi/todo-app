@@ -238,19 +238,22 @@ def add_task():
     if request.method == 'POST':
         task_name = request.form.get('task_name', '').strip()
         status = request.form.get('status', '').strip()
-        date_str = request.form.get('date', '')
+        week_str = request.form.get('week', '')  # تغيير من date إلى week
 
         try:
-            date = datetime.strptime(date_str, '%Y-%m-%d').date()
-        except ValueError:
-            flash('صيغة التاريخ غير صحيحة. يرجى اختيار تاريخ صحيح.', 'danger')
+            # تحويل قيمة الأسبوع (YYYY-WW) إلى تاريخ
+            year, week = map(int, week_str.split('-W'))
+            # الحصول على أول يوم في الأسبوع (الاثنين)
+            date = datetime.strptime(f'{year}-{week}-1', "%Y-%W-%w").date()
+        except (ValueError, AttributeError):
+            flash('صيغة الأسبوع غير صحيحة. يرجى اختيار أسبوع صحيح.', 'danger')
             return redirect(url_for('add_task'))
 
         new_task = Task(
             task_name=task_name,
             department_id=current_user.department_id,
             status=status,
-            date=date,
+            date=date,  # سيتم تخزين تاريخ أول يوم في الأسبوع
             employee_id=current_user.id
         )
 
@@ -259,7 +262,10 @@ def add_task():
         flash('تمت إضافة المهمة بنجاح', 'success')
         return redirect(url_for('dashboard'))
 
-    return render_template('add_task.html', employee_name=current_user.name, department_name=current_user.department.name)
+    return render_template('add_task.html', 
+                         employee_name=current_user.name, 
+                         department_name=current_user.department.name,
+                         current_week=datetime.now().strftime("%Y-W%W"))  # إضافة الأسبوع الحالي كقيمة افتراضية
 
 @app.route('/update_status/<int:task_id>', methods=['POST'])
 @login_required
