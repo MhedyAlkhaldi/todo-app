@@ -339,7 +339,7 @@ def run_archive():
 
 @app.route('/archived_tasks', methods=['GET', 'POST'])
 @login_required
-def dashboard():
+def archived_tasks():
     if is_admin():
         all_employees = Employee.query.options(db.joinedload(Employee.department)).all()
     else:
