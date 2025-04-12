@@ -340,42 +340,50 @@ def run_archive():
 @app.route('/archived_tasks', methods=['GET', 'POST'])
 @login_required
 def archived_tasks():
-    if is_admin():
-        all_employees = Employee.query.options(db.joinedload(Employee.department)).all()
-    else:
-        all_employees = []
+    # صلاحيات الوصول
+    departments = current_user.role == "admin"
+    employees = Employee.query.all()
 
-    date_filter = request.args.get('date_filter')
-    status_filter = request.args.get('status_filter')
-    employee_filter = request.args.get('employee_filter')
+    selected_department = request.args.get('department')
+    selected_employee = request.args.get('employee')
+    selected_week = request.args.get('week')  # بصيغة YYYY-WW
+    status_filter = request.args.get('status_filter')  # فلتر الحالة
 
-    if is_admin():
-        query = Task.query.options(db.joinedload(Task.employee), db.joinedload(Task.department))
-        if employee_filter:
-            query = query.filter(Task.employee_id == employee_filter)
-    else:
-        query = Task.query.filter_by(employee_id=current_user.id).options(db.joinedload(Task.department))
+    # الاستعلام الأساسي
+    query = ArchivedTask.query
 
-    if date_filter:
-        query = query.filter(Task.date == date_filter)
+    # فلترة حسب الصلاحيات (إذا لم يكن المستخدم Admin، يظهر المهام الخاصة به فقط)
+    if session.get('role') != 'admin':  # الموظف فقط يشوف أرشيفه
+        username = session.get('username')
+        if username:
+            query = query.join(Employee).filter(Employee.username == session['username'])
+
+    # فلترة حسب القسم
+    if selected_department:
+        query = query.filter_by(department_id=selected_department)
+
+    # فلترة حسب الموظف
+    if selected_employee:
+        query = query.filter_by(employee_id=selected_employee)
+
+    # فلترة حسب الأسبوع
+    if selected_week:
+        year, week = map(int, selected_week.split("-W"))
+        start_date = date.fromisocalendar(year, week, 1)
+        end_date = date.fromisocalendar(year, week, 7)
+        query = query.filter(ArchivedTask.date >= start_date, ArchivedTask.date <= end_date)
+
+    # فلترة حسب الحالة
     if status_filter:
-        query = query.filter(Task.status == status_filter)
+        query = query.filter(ArchivedTask.status == status_filter)
 
-    tasks = query.order_by(Task.date.desc()).all()
+    # جلب المهام
+    tasks = query.order_by(ArchivedTask.date.desc()).all()
 
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return jsonify({
-            'tasks': [{
-                'id': task.id,
-                'task_name': task.task_name,
-                'employee': {'name': task.employee.name},
-                'department': {'name': task.department.name},
-                'status': task.status,
-                'date': task.date.strftime('%Y-%m-%d')
-            } for task in tasks]
-        })
+    return render_template('archived_tasks.html', tasks=tasks, departments=departments, employees=employees,
+                           selected_department=selected_department, selected_employee=selected_employee,
+                           selected_week=selected_week, status_filter=status_filter)
 
-    return render_template('archived_tasks.html', tasks=tasks, all_employees=all_employees, is_admin=is_admin(), employee_filter=employee_filter, date_filter=date_filter, status_filter=status_filter)
 
 
 
