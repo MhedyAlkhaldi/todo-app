@@ -73,7 +73,10 @@
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav me-auto">
         <li class="nav-item">
-          <a class="nav-link active" href="/dashboard"><i class="bi bi-list-task"></i> المهام</a>
+          <a class="nav-link active" href="/dashboard"><i class="bi bi-list-task"></i> أرشيف المهام</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/archived_tasks"><i class="bi bi-archive"></i> أرشيف المهام</a>
         </li>
         {% if is_admin %}
         <li class="nav-item">
@@ -146,7 +149,20 @@
                     <input type="date" class="form-control" id="date_filter" name="date_filter" 
                            value="{{ date_filter }}" onchange="applyFilters()">
                 </div>
-                
+                <div class="col-md-3">
+                    <label for="employee_filter" class="form-label">فلتر الموظفين</label>
+                    <select class="form-select" id="employee_filter" name="employee_filter" onchange="applyFilters()">
+                        <option value="">جميع الموظفين</option>
+                        {% for emp in all_employees %}
+                        <option value="{{ emp.id }}" {% if employee_filter == emp.id|string %}selected{% endif %}>
+                            {{ emp.name }} - {{ emp.department.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+
+                    
                 <div class="col-md-3">
                     <label for="status_filter" class="form-label">فلتر الحالة</label>
                     <select class="form-select" id="status_filter" name="status_filter" onchange="applyFilters()">
