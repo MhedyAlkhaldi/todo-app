@@ -134,7 +134,7 @@
                     <label for="employee_filter" class="form-label">فلتر الموظفين</label>
                     <select class="form-select" id="employee_filter" name="employee" onchange="applyFilters()">
                         <option value="">جميع الموظفين</option>
-                        {% for emp in all_employees %}
+                        {% for emp in employees %}
                         <option value="{{ emp.id }}" {% if employee_filter == emp.id|string %}selected{% endif %}>
                             {{ emp.name }} - {{ emp.department.name }}
                         </option>
