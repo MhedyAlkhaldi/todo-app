@@ -79,7 +79,10 @@ class Employee(UserMixin, db.Model):
     department_id = db.Column(db.Integer, db.ForeignKey('department.id'), nullable=False)
     department = db.relationship('Department', backref=db.backref('employees', lazy=True))
     role = db.Column(db.String(50), default='employee')
-    
+    manager_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=True)
+
+    # علاقات
+    manager = db.relationship('Employee', remote_side=[id], backref='subordinates')
 
     def get_role(self):
         return self.role
