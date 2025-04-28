@@ -20,6 +20,9 @@ app.config['SECRET_KEY'] = secrets.token_hex(32)
 csrf = CSRFProtect(app)
 
 # إعداد الاتصال بقاعدة البيانات
+import os
+from urllib.parse import quote_plus
+
 def get_database_uri():
     uri = os.getenv('DATABASE_URL')  # استخدام متغير البيئة إذا موجود
     if uri:
@@ -35,11 +38,12 @@ def get_database_uri():
                 uri += "?sslmode=require"
     else:
         # إذا لم يوجد متغير البيئة، استخدم الرابط المحلي
-        password = "YOUR_PASSWORD"  # استبدل بكلمة المرور الخاصة بك
+        password = "gZAqNHnNEHRbrRDZQLoQqrGFLNKjWEHF"  # كلمة المرور الخاصة بك من Railway
         encoded_password = quote_plus(password)
-        uri = f"postgresql://postgres:{encoded_password}@your-db-host:5432/your-database?sslmode=require"
+        uri = f"postgresql://postgres:{encoded_password}@hopper.proxy.rlwy.net:10727/railway?sslmode=require"
     
     return uri
+
 
 # إعدادات قاعدة البيانات
 app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
