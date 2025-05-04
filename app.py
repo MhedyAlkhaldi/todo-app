@@ -10,7 +10,7 @@ import os
 import urllib.parse
 from urllib.parse import quote_plus
 from flask_login import current_user
-from app import app, db
+
 
 
 
