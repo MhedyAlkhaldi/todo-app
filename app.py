@@ -219,38 +219,41 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # إذا كان المستخدم مدير، نقوم بجلب جميع الموظفين في القسم
     if is_admin():
         all_employees = Employee.query.options(db.joinedload(Employee.department)).all()
     else:
         all_employees = []
 
-    # جلب قيم الفلاتر من الرابط
     date_filter = request.args.get('date_filter')
     status_filter = request.args.get('status_filter')
     employee_filter = request.args.get('employee_filter')
 
-    # بناء الاستعلام للمهام بناءً على الدور
+    # بناء الاستعلام بناءً على صلاحيات المستخدم
     if is_admin():
         query = Task.query.options(db.joinedload(Task.employee), db.joinedload(Task.department))
-        if employee_filter:
-            query = query.filter(Task.employee_id == employee_filter)
+        if employee_filter and employee_filter.isdigit():
+            query = query.filter(Task.employee_id == int(employee_filter))
     else:
-        # إذا لم يكن مدير، نقوم بعرض المهام التي تخص الموظف الحالي فقط
-        query = Task.query.filter_by(employee_id=current_user.id).options(db.joinedload(Task.department))
-        # إضافة تصفية للمهام بناءً على المدير
-        query = query.filter(Task.employee.has(manager_id=current_user.id))
+        # إذا المستخدم ليس أدمن ولكن مدير: عرض المهام لموظفيه
+        query = Task.query.join(Employee).filter(Employee.manager_id == current_user.id).options(
+            db.joinedload(Task.employee), db.joinedload(Task.department)
+        )
 
-    # إضافة الفلاتر للتاريخ والحالة
+    # تصفية التاريخ
     if date_filter:
-        query = query.filter(Task.date == date_filter)
+        try:
+            from datetime import datetime
+            parsed_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
+            query = query.filter(Task.date == parsed_date)
+        except ValueError:
+            pass  # تجاهل الفلتر إذا التاريخ غير صالح
+
+    # تصفية الحالة
     if status_filter:
         query = query.filter(Task.status == status_filter)
 
-    # جلب المهام بعد تطبيق الفلاتر
     tasks = query.order_by(Task.date.desc()).all()
 
-    # إذا كان الطلب من AJAX، نقوم بإرجاع المهام بتنسيق JSON
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({
             'tasks': [{
@@ -263,8 +266,14 @@ def dashboard():
             } for task in tasks]
         })
 
-    # إذا كان الطلب من المتصفح، نقوم بعرض الصفحة مع البيانات
-    return render_template('dashboard.html', tasks=tasks, all_employees=all_employees, is_admin=is_admin(), employee_filter=employee_filter, date_filter=date_filter, status_filter=status_filter)
+    return render_template('dashboard.html',
+                           tasks=tasks,
+                           all_employees=all_employees,
+                           is_admin=is_admin(),
+                           employee_filter=employee_filter,
+                           date_filter=date_filter,
+                           status_filter=status_filter)
+
 
 @app.route('/add_task', methods=['GET', 'POST'])
 @login_required
