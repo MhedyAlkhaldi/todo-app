@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>الأقسام والموظفين</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Tahoma', Arial, sans-serif;
+            background-color: #f8f9fa;
+        }
+
+        .navbar {
+            box-shadow: 0 2px 4px rgba(0,0,0,.1);
+        }
+
+        .table th {
+            background-color: #343a40;
+            color: white;
+        }
+
+        .table td {
+            vertical-align: middle;
+        }
+
+        .filter-section {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .employee-card {
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 10px;
+            text-align: center;
+            background-color: #fff;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .employee-card:hover {
+            transform: scale(1.02);
+        }
+
+        .employee-photo {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container py-4">
+    <h2 class="mb-4">الأقسام والموظفين</h2>
+
+    {% for department in departments %}
+    <div class="filter-section mb-5">
+        <h4>{{ department.name }}</h4>
+        <p><strong>مدير القسم:</strong> {{ department.manager.name if department.manager else 'غير محدد' }}</p>
+
+        <div class="row">
+            {% for employee in department.employees %}
+            <div class="col-md-3">
+                <div class="employee-card" data-bs-toggle="modal" data-bs-target="#employeeModal{{ employee.id }}">
+                    <img src="{{ employee.photo_url or url_for('static', filename='default.jpg') }}" alt="صورة الموظف" class="employee-photo">
+                    <h6>{{ employee.name }}</h6>
+                </div>
+            </div>
+
+            <!-- Modal -->
+            <div class="modal fade" id="employeeModal{{ employee.id }}" tabindex="-1" aria-labelledby="employeeModalLabel{{ employee.id }}" aria-hidden="true">
+              <div class="modal-dialog">
+                <div class="modal-content text-end">
+                  <div class="modal-header">
+                    <h5 class="modal-title" id="employeeModalLabel{{ employee.id }}">معلومات الموظف</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+                  </div>
+                  <div class="modal-body">
+                    <p><strong>الاسم:</strong> {{ employee.name }}</p>
+                    <p><strong>المنصب:</strong> {{ employee.position }}</p>
+                    <p><strong>الإيميل:</strong> {{ employee.email }}</p>
+                    <p><strong>رقم الهاتف:</strong> {{ employee.phone }}</p>
+                    <p><strong>المدير المباشر:</strong> {{ employee.manager.name if employee.manager else 'غير محدد' }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

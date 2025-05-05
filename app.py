@@ -82,6 +82,7 @@ class Employee(UserMixin, db.Model):
     department = db.relationship('Department', backref=db.backref('employees', lazy=True))
     phone = db.Column(db.String(20))
     job_title = db.Column(db.String(100))
+    email = db.Column(db.String(120), unique=True)
     role = db.Column(db.String(50), default='employee')
     manager_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=True)
 
@@ -90,6 +91,15 @@ class Employee(UserMixin, db.Model):
 
     def get_role(self):
         return self.role
+
+@app.route('/teams')
+@login_required
+def teams():
+    departments = Department.query.options(
+        db.joinedload(Department.manager),
+        db.joinedload(Department.employees)
+    ).all()
+    return render_template('teams.html', departments=departments)
 
 class Task(db.Model):
     __tablename__ = 'task'
@@ -439,6 +449,13 @@ def archived_tasks():
                          employees=employees,
                          is_admin=is_admin())
 
+@app.route('/departments')
+@login_required
+def show_departments():
+    departments = Department.query.options(
+        db.joinedload(Department.employees).joinedload(Employee.manager)
+    ).all()
+    return render_template('departments.html', departments=departments)
 
 
 
