@@ -449,13 +449,7 @@ def archived_tasks():
                          employees=employees,
                          is_admin=is_admin())
 
-@app.route('/departments')
-@login_required
-def show_departments():
-    departments = Department.query.options(
-        db.joinedload(Department.employees).joinedload(Employee.manager)
-    ).all()
-    return render_template('departments.html', departments=departments)
+
 
 
 
