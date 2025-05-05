@@ -228,25 +228,37 @@ def dashboard():
     status_filter = request.args.get('status_filter')
     employee_filter = request.args.get('employee_filter')
 
-    # بناء الاستعلام بناءً على صلاحيات المستخدم
+    from datetime import datetime
+
+    # استعلام المهام
+    query = Task.query.options(
+        db.joinedload(Task.employee),
+        db.joinedload(Task.department)
+    )
+
     if is_admin():
-        query = Task.query.options(db.joinedload(Task.employee), db.joinedload(Task.department))
         if employee_filter and employee_filter.isdigit():
             query = query.filter(Task.employee_id == int(employee_filter))
     else:
-        # إذا المستخدم ليس أدمن ولكن مدير: عرض المهام لموظفيه
-        query = Task.query.join(Employee).filter(Employee.manager_id == current_user.id).options(
-            db.joinedload(Task.employee), db.joinedload(Task.department)
+        # تحقق مما إذا كان المستخدم مديراً على موظفين آخرين
+        managed_employees = Employee.query.filter_by(manager_id=current_user.id).all()
+        managed_ids = [emp.id for emp in managed_employees]
+
+        # شوف إذا كان هو مدير أو موظف عادي
+        query = query.filter(
+            db.or_(
+                Task.employee_id.in_(managed_ids),
+                Task.employee_id == current_user.id
+            )
         )
 
     # تصفية التاريخ
     if date_filter:
         try:
-            from datetime import datetime
             parsed_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
             query = query.filter(Task.date == parsed_date)
         except ValueError:
-            pass  # تجاهل الفلتر إذا التاريخ غير صالح
+            pass
 
     # تصفية الحالة
     if status_filter:
@@ -273,6 +285,7 @@ def dashboard():
                            employee_filter=employee_filter,
                            date_filter=date_filter,
                            status_filter=status_filter)
+
 
 
 @app.route('/add_task', methods=['GET', 'POST'])
