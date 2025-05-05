@@ -80,6 +80,8 @@ class Employee(UserMixin, db.Model):
     password = db.Column(db.String(50), nullable=False)
     department_id = db.Column(db.Integer, db.ForeignKey('department.id'), nullable=False)
     department = db.relationship('Department', backref=db.backref('employees', lazy=True))
+    phone = db.Column(db.String(20))
+    job_title = db.Column(db.String(100))
     role = db.Column(db.String(50), default='employee')
     manager_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=True)
 
