@@ -152,9 +152,9 @@
                 {% endif %}
                 
                 <div class="col-md-3">
-                    <label for="date_filter" class="form-label">فلتر التاريخ</label>
-                    <input type="date" class="form-control" id="date_filter" name="date_filter" 
-                           value="{{ date_filter }}" onchange="applyFilters()">
+                    <label for="week" class="form-label">الأسبوع</label>
+                    <input type="week" class="form-control" id="week" name="week" 
+                           value="{{ request.args.get('week') }}">
                 </div>
                 
                 <div class="col-md-3">
