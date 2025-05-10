@@ -14,6 +14,7 @@ from flask_login import current_user
 
 
 
+
 # تهيئة التطبيق
 app = Flask(__name__)
 
@@ -354,7 +355,8 @@ def update_status(task_id):
 def delete_task(task_id):
     task = Task.query.get_or_404(task_id)
 
-    if not can_edit_task(task):
+    # السماح بالحذف فقط للمسؤول أو المدير أو منشئ المهمة
+    if current_user.role not in ['admin', 'manager'] and task.user_id != current_user.id:
         flash('ليس لديك صلاحية لحذف هذه المهمة', 'danger')
         return redirect(url_for('dashboard'))
 
@@ -362,6 +364,7 @@ def delete_task(task_id):
     db.session.commit()
     flash('تم حذف المهمة بنجاح', 'success')
     return redirect(url_for('dashboard'))
+
 
 @app.route('/task/<int:task_id>')
 @login_required
@@ -448,18 +451,6 @@ def archived_tasks():
                          departments=departments, 
                          employees=employees,
                          is_admin=is_admin())
-
-@app.route('/delete_task/<int:task_id>', methods=['POST'])
-def delete_task(task_id):
-    if not session.get('is_admin'):
-        return redirect('/dashboard')
-    
-    conn = get_db_connection()
-    conn.execute('DELETE FROM tasks WHERE id = %s', (task_id,))
-    conn.commit()
-    conn.close()
-    return redirect('/dashboard')
-
 
 
 if __name__ == '__main__':
