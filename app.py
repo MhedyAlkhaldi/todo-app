@@ -449,7 +449,16 @@ def archived_tasks():
                          employees=employees,
                          is_admin=is_admin())
 
-
+@app.route('/delete_task/<int:task_id>', methods=['POST'])
+def delete_task(task_id):
+    if not session.get('is_admin'):
+        return redirect('/dashboard')
+    
+    conn = get_db_connection()
+    conn.execute('DELETE FROM tasks WHERE id = %s', (task_id,))
+    conn.commit()
+    conn.close()
+    return redirect('/dashboard')
 
 
 
