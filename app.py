@@ -232,32 +232,33 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    # جلب جميع الأقسام (مطلوب للفلتر الجديد)
+    all_departments = Department.query.all()
+    
     if is_admin():
         all_employees = Employee.query.options(db.joinedload(Employee.department)).all()
     else:
         all_employees = []
 
+    # جلب جميع معايير الفلترة
     date_filter = request.args.get('date_filter')
     status_filter = request.args.get('status_filter')
     employee_filter = request.args.get('employee_filter')
+    department_filter = request.args.get('department_filter')  # الفلتر الجديد
 
-    from datetime import datetime
-
-    # استعلام المهام
+    # استعلام المهام الأساسي
     query = Task.query.options(
         db.joinedload(Task.employee),
         db.joinedload(Task.department)
     )
 
+    # تطبيق فلتر الصلاحيات (يبقى كما هو)
     if is_admin():
         if employee_filter and employee_filter.isdigit():
             query = query.filter(Task.employee_id == int(employee_filter))
     else:
-        # تحقق مما إذا كان المستخدم مديراً على موظفين آخرين
         managed_employees = Employee.query.filter_by(manager_id=current_user.id).all()
         managed_ids = [emp.id for emp in managed_employees]
-
-        # شوف إذا كان هو مدير أو موظف عادي
         query = query.filter(
             db.or_(
                 Task.employee_id.in_(managed_ids),
@@ -265,7 +266,11 @@ def dashboard():
             )
         )
 
-    # تصفية التاريخ
+    # 1. فلتر الأقسام الجديد (يضاف قبل الفلاتر الأخرى)
+    if department_filter and department_filter.isdigit():
+        query = query.filter(Task.department_id == int(department_filter))
+
+    # 2. فلتر التاريخ (يبقى كما هو)
     if date_filter:
         try:
             parsed_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
@@ -273,12 +278,14 @@ def dashboard():
         except ValueError:
             pass
 
-    # تصفية الحالة
+    # 3. فلتر الحالة (يبقى كما هو)
     if status_filter:
         query = query.filter(Task.status == status_filter)
 
+    # تنفيذ الاستعلام
     tasks = query.order_by(Task.date.desc()).all()
 
+    # التعامل مع طلبات AJAX (يبقى كما هو)
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({
             'tasks': [{
@@ -292,12 +299,14 @@ def dashboard():
         })
 
     return render_template('dashboard.html',
-                           tasks=tasks,
-                           all_employees=all_employees,
-                           is_admin=is_admin(),
-                           employee_filter=employee_filter,
-                           date_filter=date_filter,
-                           status_filter=status_filter)
+                         tasks=tasks,
+                         all_employees=all_employees,
+                         all_departments=all_departments,  # ← تمرير الأقسام للقالب
+                         is_admin=is_admin(),
+                         employee_filter=employee_filter,
+                         department_filter=department_filter,  # ← الفلتر الجديد
+                         date_filter=date_filter,
+                         status_filter=status_filter)
 
 
 
