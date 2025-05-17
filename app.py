@@ -183,26 +183,42 @@ def admin():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # إذا كان المستخدم مسجلًا بالفعل
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
+    
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        
+        # التحقق من الحقول الفارغة
         if not username or not password:
             flash("يرجى إدخال اسم المستخدم وكلمة المرور", "danger")
             return redirect(url_for('login'))
+        
+        # البحث عن المستخدم
         user = Employee.query.filter_by(username=username).first()
+        
         if user and user.check_password(password):
+            # تسجيل الدخول الناجح
             login_user(user)
-            session['username'] = user.username
+            session['user_id'] = user.id  # الأفضل استخدام user_id بدلاً من username
             session['role'] = user.role
-            if user.role == 'admin':
-                flash(f"تم التسجيل كمدير {user.name}", "success")
-            else:
-                flash(f"تم التسجيل كموظف {user.name}", "success")
-            return redirect(url_for('dashboard'))
+            session.permanent = True  # جعل الجلسة دائمة
+            
+            # رسالة الترحيب
+            welcome_msg = f"تم التسجيل كمدير {user.name}" if user.role == 'admin' else f"تم التسجيل كموظف {user.name}"
+            flash(welcome_msg, "success")
+            
+            # التوجيه للصفحة المقصودة أو dashboard
+            next_page = request.args.get('next') or url_for('dashboard'))
+            return redirect(next_page)
         else:
+            # فشل تسجيل الدخول
             flash("اسم المستخدم أو كلمة المرور غير صحيحة", "danger")
+            return redirect(url_for('login'))
+    
+    # طلب GET - عرض صفحة التسجيل
     return render_template('login.html')
 
 
