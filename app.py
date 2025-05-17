@@ -11,6 +11,8 @@ from urllib.parse import quote_plus
 from sqlalchemy import text
 from flask_wtf.csrf import generate_csrf
 from sqlalchemy import text
+import re
+
 
 
 
@@ -258,33 +260,44 @@ def logout():
     return redirect(url_for('login'))
 
 
+from datetime import datetime, timedelta
+import re
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
     all_departments = Department.query.all()
-    if is_admin():
-        all_employees = Employee.query.options(db.joinedload(Employee.department)).all()
-    else:
-        all_employees = []
+    all_employees = Employee.query.options(db.joinedload(Employee.department)).all() if is_admin() else []
 
-    # الفلاتر
+    # الفلاتر من الطلب
     date_filter = request.args.get('date_filter')
     status_filter = request.args.get('status_filter')
     employee_filter = request.args.get('employee_filter')
     department_filter = request.args.get('department_filter')
+    week_filter = request.args.get('week')
 
-    query = Task.query.options(db.joinedload(Task.employee), db.joinedload(Task.department))
+    # بداية الاستعلام
+    query = Task.query.options(
+        db.joinedload(Task.employee),
+        db.joinedload(Task.department)
+    )
 
+    # تصفية حسب المستخدم الحالي
     if is_admin():
         if employee_filter and employee_filter.isdigit():
             query = query.filter(Task.employee_id == int(employee_filter))
     else:
         managed_ids = [emp.id for emp in Employee.query.filter_by(manager_id=current_user.id).all()]
-        query = query.filter(db.or_(Task.employee_id.in_(managed_ids), Task.employee_id == current_user.id))
+        query = query.filter(db.or_(
+            Task.employee_id.in_(managed_ids),
+            Task.employee_id == current_user.id
+        ))
 
+    # فلترة حسب القسم
     if department_filter and department_filter.isdigit():
         query = query.filter(Task.department_id == int(department_filter))
 
+    # فلترة حسب التاريخ (يوم واحد)
     if date_filter:
         try:
             parsed_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
@@ -292,6 +305,22 @@ def dashboard():
         except ValueError:
             pass
 
+    # فلترة حسب الأسبوع (من السبت إلى الجمعة)
+    start_of_week = end_of_week = None
+    if week_filter:
+        match = re.match(r"(\d{4})-W(\d{2})", week_filter)
+        if match:
+            year, week = int(match.group(1)), int(match.group(2))
+            try:
+                # نحصل على الإثنين كبداية ISO، ثم نرجع ليوم السبت
+                monday = datetime.strptime(f"{year}-W{week}-1", "%G-W%V-%u").date()
+                start_of_week = monday - timedelta(days=2)
+                end_of_week = start_of_week + timedelta(days=6)
+                query = query.filter(Task.date.between(start_of_week, end_of_week))
+            except ValueError:
+                pass
+
+    # فلترة حسب الحالة
     if status_filter:
         query = query.filter(Task.status == status_filter)
 
@@ -317,7 +346,11 @@ def dashboard():
                            employee_filter=employee_filter,
                            department_filter=department_filter,
                            date_filter=date_filter,
-                           status_filter=status_filter)
+                           week_filter=week_filter,
+                           status_filter=status_filter,
+                           start_of_week=start_of_week,
+                           end_of_week=end_of_week)
+
 
 
 @app.route('/add_task', methods=['GET', 'POST'])
