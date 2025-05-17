@@ -29,25 +29,22 @@ import os
 from urllib.parse import quote_plus
 
 def get_database_uri():
-    uri = os.getenv('DATABASE_URL')  # استخدام متغير البيئة إذا موجود
-    if uri:
-        # التأكد من أن الرابط في الصيغة الصحيحة
-        if uri.startswith("postgres://"):
-            uri = uri.replace("postgres://", "postgresql://", 1)
-        
-        # إذا كنت تستخدم Railway أو Supabase، تأكد من إضافة SSL
-        if "railway" in uri or "supabase" in uri:
-            if '?' in uri:
-                uri += "&sslmode=require"
-            else:
-                uri += "?sslmode=require"
-    else:
-        # إذا لم يوجد متغير البيئة، استخدم الرابط المحلي
-        password = "gZAqNHnNEHRbrRDZQLoQqrGFLNKjWEHF"  # كلمة المرور الخاصة بك من Railway
-        encoded_password = quote_plus(password)
-        uri = f"postgresql://postgres:{encoded_password}@hopper.proxy.rlwy.net:10727/railway?sslmode=require"
+    # 1. الأولوية لمتغير البيئة
+    uri = os.getenv('DATABASE_URL')
     
-    return uri
+    # 2. إذا كان الاتصال عبر Railway
+    if not uri and 'railway' in os.getenv('PYTHON_VERSION', ''):
+        uri = "postgresql://postgres:gZAqNHnNEHRbrRDZQLoQqrGFLNKjWEHF@hopper.proxy.rlwy.net:10727/railway"
+    
+    # 3. إصلاح صيغة الرابط
+    if uri and uri.startswith("postgres://"):
+        uri = uri.replace("postgres://", "postgresql://", 1)
+    
+    # 4. إضافة SSL
+    if uri and ('railway' in uri or 'supabase' in uri):
+        uri += "?sslmode=require" if '?' not in uri else "&sslmode=require"
+    
+    return uri or 'sqlite:///local.db'  # Fallback للتنمية المحلية
 
 
 # إعدادات قاعدة البيانات
@@ -469,6 +466,16 @@ def archived_tasks():
                          employees=employees,
                          is_admin=is_admin())
 
+
+
+
+with app.app_context():
+    try:
+        db.session.execute('SELECT 1')
+        print("✅ تم الاتصال بنجاح مع قاعدة البيانات")
+    except Exception as e:
+        print(f"❌ فشل الاتصال: {e}")
+        raise
 
 if __name__ == '__main__':
     app.run(debug=True)
