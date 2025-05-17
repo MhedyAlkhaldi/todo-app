@@ -266,11 +266,13 @@
                                     <i class="bi bi-chat-left-text"></i>
                                 </button>
                                 {% endif %}
+                                {% if current_user.id == task.employee_id %}
                                 <form action="{{ url_for('delete_task', task_id=task.id) }}" method="POST">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-danger" onclick="return confirm('هل أنت متأكد؟')">
                                     حذف
                                 </button>
+                                {% endif %}
                             </form>
                             </div>
                         </td>
