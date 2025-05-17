@@ -1,135 +1,213 @@
-{% extends 'base.html' %}
-{% block content %}
-<div class="container py-4">
-    <h1 class="mb-4 text-center">الهيكل التنظيمي</h1>
-    
-    <!-- شجرة المدير التنفيذي -->
-    <div class="org-tree">
-        {% set ceo = Employee.query.filter_by(role='CEO').first() %}
-        {% if ceo %}
-            <div class="ceo-card text-center mb-4">
-                <div class="employee-card" onclick="showEmployeeModal({{ ceo.id }})">
-                    {% if ceo.profile_image %}
-                        <img src="{{ url_for('static', filename='profile_images/' + ceo.profile_image) }}" 
-                             class="profile-img" alt="{{ ceo.name }}">
-                    {% else %}
-                        <img src="{{ url_for('static', filename='images/default-profile.png') }}" 
-                             class="profile-img" alt="صورة افتراضية">
-                    {% endif %}
-                    <h5>{{ ceo.name }}</h5>
-                    <p class="text-muted">{{ ceo.job_title }}</p>
-                </div>
-                
-                <!-- مدراء الأقسام -->
-                <div class="d-flex justify-content-center">
-                    {% for dept in Department.query.all() %}
-                        {% if dept.manager %}
-                            <div class="dept-level mx-3">
-                                <div class="employee-card" onclick="showEmployeeModal({{ dept.manager.id }})">
-                                    {% if dept.manager.profile_image %}
-                                        <img src="{{ url_for('static', filename='profile_images/' + dept.manager.profile_image) }}" 
-                                             class="profile-img" alt="{{ dept.manager.name }}">
-                                    {% else %}
-                                        <img src="{{ url_for('static', filename='images/default-profile.png') }}" 
-                                             class="profile-img" alt="صورة افتراضية">
-                                    {% endif %}
-                                    <h5>{{ dept.manager.name }}</h5>
-                                    <p class="text-muted">{{ dept.manager.job_title }}</p>
-                                    <small>{{ dept.name }}</small>
-                                </div>
-                                
-                                <!-- موظفو القسم -->
-                                <div class="d-flex justify-content-center">
-                                    {% for emp in dept.employees if emp.id != dept.manager.id %}
-                                        <div class="emp-level mx-2">
-                                            <div class="employee-card" onclick="showEmployeeModal({{ emp.id }})">
-                                                {% if emp.profile_image %}
-                                                    <img src="{{ url_for('static', filename='profile_images/' + emp.profile_image) }}" 
-                                                         class="profile-img-sm" alt="{{ emp.name }}">
-                                                {% else %}
-                                                    <img src="{{ url_for('static', filename='images/default-profile.png') }}" 
-                                                         class="profile-img-sm" alt="صورة افتراضية">
-                                                {% endif %}
-                                                <h6>{{ emp.name }}</h6>
-                                                <small class="text-muted">{{ emp.job_title }}</small>
-                                            </div>
-                                        </div>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-            </div>
-        {% endif %}
-    </div>
-</div>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>الهيكل التنظيمي</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Cairo', sans-serif;
+            padding: 20px;
+        }
 
-<!-- Modal لعرض تفاصيل الموظف -->
-<div class="modal fade" id="employeeModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">تفاصيل الموظف</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" id="employeeDetails">
-                <!-- سيتم ملؤه بالجافاسكريبت -->
-            </div>
+        .org-container {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 20px;
+            padding: 20px 0;
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        .dept-card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 20px;
+            min-width: auto;
+            display: inline-block;
+        }
+
+        .dept-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            text-align: center;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .employees-container {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 10px;
+            overflow-x: auto;
+            padding-top: 10px;
+        }
+
+        .employee-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            min-width: 120px;
+            cursor: pointer;
+        }
+
+        .employee-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .profile-img,
+        .profile-img-sm {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #dee2e6;
+            margin: 0 auto 10px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- شريط التنقل -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container">
+        <a class="navbar-brand" href="/dashboard">
+            <i class="bi bi-speedometer2"></i> لوحة التحكم
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+            aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link active" href="/dashboard"><i class="bi bi-list-task"></i> المهام</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/archived_tasks"><i class="bi bi-archive"></i> أرشيف المهام</a>
+                </li>
+                {% if is_admin %}
+                <li class="nav-item">
+                    <a class="nav-link" href="/admin"><i class="bi bi-person-gear"></i> لوحة المدير</a>
+                </li>
+                {% endif %}
+            </ul>
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="/add_task"><i class="bi bi-plus-circle"></i> إضافة مهمة</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/org_chart"><i class="bi bi-diagram-3"></i> الهيكل التنظيمي</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/logout"><i class="bi bi-box-arrow-left"></i> تسجيل الخروج</a>
+                </li>
+            </ul>
         </div>
     </div>
+</nav>
+
+<!-- محتوى الصفحة -->
+<div class="container py-4">
+    <h1 class="mb-5 text-center">الهيكل التنظيمي</h1>
+
+    <!-- المدير التنفيذي -->
+    {% if ceo %}
+    <div class="text-center mb-5">
+        <div class="employee-card d-inline-block" onclick="showEmployeeModal({{ ceo.id }})">
+            <img src="{{ url_for('static', filename='uploads/' + (ceo.profile_image or 'default-profile.png')) }}" class="profile-img" alt="{{ ceo.name }}">
+
+            <h4>{{ ceo.name }}</h4>
+            <p class="text-muted">{{ ceo.job_title }}</p>
+        </div>
+    </div>
+    {% else %}
+    <p class="text-center text-muted">لا يوجد مدير تنفيذي حالياً.</p>
+    {% endif %}
+
+    {% set colors = ['#f8d7da', '#d1ecf1', '#d4edda', '#fff3cd', '#e2e3e5', '#cce5ff'] %}
+
+    <!-- الأقسام -->
+    <div class="org-container">
+        {% for dept in departments if dept.name != 'Administrative' %}
+        {% set color = colors[loop.index0 % colors|length] %}
+        <div class="dept-card" style="background-color: {{ color }};">
+            <div class="dept-title">{{ dept.name }}</div>
+
+            {% set manager = dept.manager %}
+            {% if not manager and dept.employees|length == 1 %}
+                {% set manager = dept.employees[0] %}
+            {% endif %}
+
+            {% if manager %}
+            <div class="employee-card bg-white p-3" onclick="showEmployeeModal({{ manager.id }})">
+                <img src="{{ url_for('static', filename='uploads/' + (manager.profile_image or 'default-profile.png')) }}" class="profile-img mb-2" alt="{{ manager.name }}">
+
+                <h5>{{ manager.name }}</h5>
+                <p class="text-muted small">{{ manager.job_title }}</p>
+            </div>
+            {% else %}
+            <div class="employee-card bg-light text-muted text-center">
+                لا يوجد مدير لهذا القسم
+            </div>
+            {% endif %}
+
+            <div class="employees-container mt-3">
+                {% set employees_without_manager = dept.employees | selectattr('id', 'ne', manager.id if manager else None) | list %}
+                {% if employees_without_manager %}
+                {% for emp in employees_without_manager %}
+                <div class="employee-card bg-white p-2" onclick="showEmployeeModal({{ emp.id }})">
+                    <img src="{{ url_for('static', filename='uploads/' + (emp.profile_image or 'default-profile.png')) }}" class="profile-img-sm mb-1" alt="{{ emp.name }}">
+
+                    <h6 class="mb-0">{{ emp.name }}</h6>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="text-center text-muted fst-italic">
+                    لا يوجد موظفين آخرين في هذا القسم.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
 </div>
 
-<style>
-    .org-tree {
-        text-align: center;
-    }
-    .employee-card {
-        cursor: pointer;
-        padding: 15px;
-        border-radius: 10px;
-        background: #f8f9fa;
-        transition: all 0.3s;
-        margin-bottom: 15px;
-    }
-    .employee-card:hover {
-        background: #e9ecef;
-        transform: translateY(-5px);
-    }
-    .profile-img {
-        width: 100px;
-        height: 100px;
-        border-radius: 50%;
-        object-fit: cover;
-        border: 3px solid #dee2e6;
-    }
-    .profile-img-sm {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        object-fit: cover;
-        border: 2px solid #dee2e6;
-    }
-    .dept-level {
-        display: inline-block;
-        vertical-align: top;
-    }
-    .emp-level {
-        display: inline-block;
-    }
-</style>
+<!-- نافذة التفاصيل -->
+<div class="modal fade" id="employeeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content text-center">
+      <div class="modal-header">
+        <h5 class="modal-title">تفاصيل الموظف</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+      </div>
+      <div class="modal-body" id="employeeDetails">
+        <!-- تفاصيل الموظف تظهر هنا -->
+      </div>
+    </div>
+  </div>
+</div>
 
+<!-- JavaScript -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 function showEmployeeModal(employeeId) {
     fetch(`/employee/${employeeId}/details`)
         .then(response => response.json())
         .then(data => {
             const modalContent = `
-                <div class="text-center">
-                    <img src="${data.profile_image ? 
-                        '/static/profile_images/' + data.profile_image : 
-                        '/static/images/default-profile.png'}" 
-                         class="profile-img mb-3" alt="${data.name}">
+                <div>
+                    <img src="${data.profile_image ? '/static/uploads/' + data.profile_image : '/static/uploads/default-profile.png'}" class="profile-img mb-3" alt="${data.name}">
+
                     <h4>${data.name}</h4>
                     <p><strong>المنصب:</strong> ${data.job_title}</p>
                     <p><strong>القسم:</strong> ${data.department}</p>
@@ -139,9 +217,13 @@ function showEmployeeModal(employeeId) {
                 </div>
             `;
             document.getElementById('employeeDetails').innerHTML = modalContent;
-            var modal = new bootstrap.Modal(document.getElementById('employeeModal'));
+            const modal = new bootstrap.Modal(document.getElementById('employeeModal'));
             modal.show();
+        })
+        .catch(err => {
+            alert('حدث خطأ أثناء تحميل بيانات الموظف.');
         });
 }
 </script>
-{% endblock %}
+</body>
+</html>

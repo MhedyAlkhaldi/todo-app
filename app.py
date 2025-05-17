@@ -9,13 +9,22 @@ import secrets
 import os
 from urllib.parse import quote_plus
 from sqlalchemy import text
+from flask_wtf.csrf import generate_csrf
+from sqlalchemy import text
+
+
 
 # ------------------------------
 # إعداد التطبيق
 # ------------------------------
 app = Flask(__name__)
-app.config['SECRET_KEY'] = secrets.token_hex(32)
+app.config['SECRET_KEY'] = secrets.token_hex(32)  # ضروري لحماية الجلسات
 csrf = CSRFProtect(app)
+
+
+@app.context_processor
+def inject_csrf_token():
+    return dict(csrf_token=generate_csrf)
 
 # ------------------------------
 # إعداد قاعدة البيانات
@@ -46,62 +55,79 @@ login_manager.login_view = 'login'
 # ------------------------------
 class Department(db.Model):
     __tablename__ = 'department'
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+
+    employees = db.relationship('Employee', back_populates='department', foreign_keys='Employee.department_id')
+    tasks = db.relationship('Task', back_populates='department', foreign_keys='Task.department_id')
+    archived_tasks = db.relationship('ArchivedTask', back_populates='department', foreign_keys='ArchivedTask.department_id')
 
 
 class Employee(UserMixin, db.Model):
     __tablename__ = 'employee'
+    def get_role(self):
+        return self.role
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
+
     department_id = db.Column(db.Integer, db.ForeignKey('department.id'), nullable=False)
-    department = db.relationship('Department', backref=db.backref('employees', lazy=True))
+    department = db.relationship('Department', back_populates='employees', foreign_keys=[department_id])
+
     phone = db.Column(db.String(20))
     job_title = db.Column(db.String(100))
     email = db.Column(db.String(120), unique=True)
     role = db.Column(db.String(50), default='employee')
+
     manager_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=True)
-    manager = db.relationship('Employee', remote_side=[id], backref='subordinates')
-    country = db.Column(db.String(100))  # إضافة حقل البلد
-    profile_image = db.Column(db.String(255))  # مسار ملف الصورة
+    manager = db.relationship('Employee', remote_side=[id], backref='subordinates', foreign_keys=[manager_id])
 
-    def get_role(self):
-        return self.role
+    country = db.Column(db.String(100))
+    profile_image = db.Column(db.String(255))
 
-    def set_password(self, password):
-        self.password = generate_password_hash(password)
-
-    def check_password(self, password):
-        return check_password_hash(self.password, password)
+    tasks = db.relationship('Task', back_populates='employee', foreign_keys='Task.employee_id')
+    archived_tasks = db.relationship('ArchivedTask', back_populates='employee', foreign_keys='ArchivedTask.employee_id')
 
 
 class Task(db.Model):
     __tablename__ = 'task'
+
     id = db.Column(db.Integer, primary_key=True)
     task_name = db.Column(db.String(200), nullable=False)
+
     department_id = db.Column(db.Integer, db.ForeignKey('department.id'), nullable=False)
+    department = db.relationship('Department', back_populates='tasks', foreign_keys=[department_id])
+
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
+    employee = db.relationship('Employee', back_populates='tasks', foreign_keys=[employee_id])
+
     status = db.Column(db.String(50), nullable=False)
     date = db.Column(db.Date, nullable=False)
-    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
-    department = db.relationship('Department', backref=db.backref('tasks', lazy=True))
-    employee = db.relationship('Employee', backref=db.backref('tasks', lazy=True))
     description = db.Column(db.Text, nullable=True)
+
 
 
 class ArchivedTask(db.Model):
     __tablename__ = 'archived_task'
+
     id = db.Column(db.Integer, primary_key=True)
     original_task_id = db.Column(db.Integer)
+
     task_name = db.Column(db.String(200))
-    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'))
-    employee = db.relationship('Employee', backref='archived_tasks')
+
     department_id = db.Column(db.Integer, db.ForeignKey('department.id'))
-    department = db.relationship('Department', backref='archived_tasks')
+    department = db.relationship('Department', back_populates='archived_tasks', foreign_keys=[department_id])
+
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'))
+    employee = db.relationship('Employee', back_populates='archived_tasks', foreign_keys=[employee_id])
+
     status = db.Column(db.String(50))
     date = db.Column(db.Date)
     description = db.Column(db.Text)
+
+
 
 
 # ------------------------------
@@ -199,7 +225,8 @@ def login():
         # البحث عن المستخدم
         user = Employee.query.filter_by(username=username).first()
         
-        if user and user.check_password(password):
+        if user and user.password == password:
+
             # تسجيل الدخول الناجح
             login_user(user)
             session['user_id'] = user.id  # الأفضل استخدام user_id بدلاً من username
@@ -211,7 +238,7 @@ def login():
             flash(welcome_msg, "success")
             
             # التوجيه للصفحة المقصودة أو dashboard
-            next_page = request.args.get('next') or url_for('dashboard'))
+            next_page = request.args.get('next') or url_for('dashboard')
             return redirect(next_page)
         else:
             # فشل تسجيل الدخول
@@ -444,7 +471,48 @@ def teams():
 @app.route('/org_chart')
 @login_required
 def org_chart():
-    return render_template('org_chart.html')
+    ceo = Employee.query.filter_by(manager_id=None).first()  # المدير التنفيذي ما عنده مدير
+    
+    departments = Department.query.options(db.subqueryload(Department.employees)).all()
+
+    for dept in departments:
+        # نبحث عن الموظف في القسم اللي هو مدير (يظهر كـ manager_id لكثير موظفين من نفس القسم)
+        managers_in_dept = set(emp.manager_id for emp in dept.employees if emp.manager_id)
+        # مدير القسم هو الموظف الذي رقمه موجود في مجموعة المديرين وفي نفس الوقت هو موظف في القسم نفسه
+        dept.manager = next((emp for emp in dept.employees if emp.id in managers_in_dept), None)
+
+    return render_template('org_chart.html', ceo=ceo, departments=departments)
+
+
+from flask import jsonify
+
+@app.route('/employee/<int:employee_id>/details')
+def employee_details(employee_id):
+    query = text("""
+        SELECT e.id, e.name, e.job_title, d.name AS department, e.country, e.phone, e.email, e.profile_image
+        FROM employee e
+        LEFT JOIN department d ON e.department_id = d.id
+        WHERE e.id = :id
+    """)
+
+    employee = db.session.execute(query, {"id": employee_id}).fetchone()
+
+    if not employee:
+        return jsonify({"error": "الموظف غير موجود"}), 404
+
+    data = {
+        "id": employee.id,
+        "name": employee.name,
+        "job_title": employee.job_title,
+        "department": employee.department,  # هنا اسم القسم بدل الرقم
+        "country": employee.country,
+        "phone": employee.phone,
+        "email": employee.email,
+        "profile_image": employee.profile_image or "default-profile.png"
+    }
+
+    return jsonify(data)
+
 
     
     
