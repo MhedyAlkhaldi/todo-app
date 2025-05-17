@@ -10,24 +10,16 @@ import os
 import urllib.parse
 from urllib.parse import quote_plus
 from flask_login import current_user
-
-
-
-
+from sqlalchemy import text  # Import needed for raw SQL queries
 
 # تهيئة التطبيق
 app = Flask(__name__)
 
-    
-    
 # إعدادات الأمان
 app.config['SECRET_KEY'] = secrets.token_hex(32)
 csrf = CSRFProtect(app)
 
 # إعداد الاتصال بقاعدة البيانات
-import os
-from urllib.parse import quote_plus
-
 def get_database_uri():
     # 1. الأولوية لمتغير البيئة
     uri = os.getenv('DATABASE_URL')
@@ -46,7 +38,6 @@ def get_database_uri():
     
     return uri or 'sqlite:///local.db'  # Fallback للتنمية المحلية
 
-
 # إعدادات قاعدة البيانات
 app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -59,13 +50,6 @@ migrate = Migrate(app, db)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# الآن يمكنك استيراد نماذج قاعدة البيانات والقيام بمزيد من التهيئة هنا
-
-
-    
-    
-   
-
 # موديلات قاعدة البيانات
 class Department(db.Model):
     __tablename__ = 'department'
@@ -77,7 +61,7 @@ class Employee(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(50), nullable=False)
+    password = db.Column(db.String(255), nullable=False)  # Changed to 255 for hashed passwords
     department_id = db.Column(db.Integer, db.ForeignKey('department.id'), nullable=False)
     department = db.relationship('Department', backref=db.backref('employees', lazy=True))
     phone = db.Column(db.String(20))
@@ -92,14 +76,11 @@ class Employee(UserMixin, db.Model):
     def get_role(self):
         return self.role
 
-@app.route('/teams')
-@login_required
-def teams():
-    departments = Department.query.options(
-        db.joinedload(Department.manager),
-        db.joinedload(Department.employees)
-    ).all()
-    return render_template('teams.html', departments=departments)
+    def set_password(self, password):
+        self.password = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password, password)
 
 class Task(db.Model):
     __tablename__ = 'task'
@@ -118,14 +99,23 @@ class ArchivedTask(db.Model):
     original_task_id = db.Column(db.Integer)
     task_name = db.Column(db.String(100))
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'))
-    employee = db.relationship('Employee', backref='archived_tasks')  # 👈 هذا السطر الجديد
+    employee = db.relationship('Employee', backref='archived_tasks')
     department_id = db.Column(db.Integer, db.ForeignKey('department.id'))
     department = db.relationship('Department', backref='archived_tasks')
     status = db.Column(db.String(20))
     date = db.Column(db.Date)
     description = db.Column(db.Text)
-    
-    
+
+@login_manager.user_loader
+def load_user(user_id):
+    return Employee.query.get(int(user_id))
+
+def is_admin():
+    return current_user.is_authenticated and current_user.get_role() == 'admin'
+
+def can_edit_task(task):
+    return is_admin() or task.employee_id == current_user.id
+
 def archive_completed_tasks():
     today = date.today()
     tasks_to_archive = Task.query.filter(Task.status == 'مكتمل', Task.date < today).all()
@@ -147,27 +137,12 @@ def archive_completed_tasks():
 
 def get_tasks_for_user(user):
     if user.role == 'admin':
-        # إذا كان المستخدم هو "admin"، يعرض جميع المهام
         tasks = Task.query.all()
     elif user.role == 'manager':
-        # إذا كان المستخدم هو "manager"، يعرض المهام فقط للموظفين التابعين له
         tasks = Task.query.filter(Task.employee_id.in_([subordinate.id for subordinate in user.subordinates])).all()
     else:
-        # إذا كان المستخدم هو "employee"، يعرض فقط المهام الخاصة به
         tasks = Task.query.filter(Task.employee_id == user.id).all()
     return tasks
-
-
-
-@login_manager.user_loader
-def load_user(user_id):
-    return Employee.query.get(int(user_id))
-
-def is_admin():
-    return current_user.is_authenticated and current_user.get_role() == 'admin'
-
-def can_edit_task(task):
-    return is_admin() or task.employee_id == current_user.id
 
 @app.route('/')
 def index():
@@ -197,15 +172,21 @@ def admin():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+        
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if not username or not password:
+            flash("يرجى إدخال اسم المستخدم وكلمة المرور", "danger")
+            return redirect(url_for('login'))
+            
         user = Employee.query.filter_by(username=username).first()
 
-        if user and user.password == password:
+        if user and user.check_password(password):
             login_user(user)
-
-            # 🟢 هون أضفنا تخزين الاسم والصلاحية بالسشن
             session['username'] = user.username
             session['role'] = user.role
 
@@ -219,19 +200,17 @@ def login():
     
     return render_template('login.html')
 
-
-
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
+    session.clear()
     flash("تم تسجيل الخروج بنجاح", 'success')
     return redirect(url_for('login'))
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # جلب جميع الأقسام (مطلوب للفلتر الجديد)
     all_departments = Department.query.all()
     
     if is_admin():
@@ -239,19 +218,16 @@ def dashboard():
     else:
         all_employees = []
 
-    # جلب جميع معايير الفلترة
     date_filter = request.args.get('date_filter')
     status_filter = request.args.get('status_filter')
     employee_filter = request.args.get('employee_filter')
-    department_filter = request.args.get('department_filter')  # الفلتر الجديد
+    department_filter = request.args.get('department_filter')
 
-    # استعلام المهام الأساسي
     query = Task.query.options(
         db.joinedload(Task.employee),
         db.joinedload(Task.department)
     )
 
-    # تطبيق فلتر الصلاحيات (يبقى كما هو)
     if is_admin():
         if employee_filter and employee_filter.isdigit():
             query = query.filter(Task.employee_id == int(employee_filter))
@@ -265,11 +241,9 @@ def dashboard():
             )
         )
 
-    # 1. فلتر الأقسام الجديد (يضاف قبل الفلاتر الأخرى)
     if department_filter and department_filter.isdigit():
         query = query.filter(Task.department_id == int(department_filter))
 
-    # 2. فلتر التاريخ (يبقى كما هو)
     if date_filter:
         try:
             parsed_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
@@ -277,14 +251,11 @@ def dashboard():
         except ValueError:
             pass
 
-    # 3. فلتر الحالة (يبقى كما هو)
     if status_filter:
         query = query.filter(Task.status == status_filter)
 
-    # تنفيذ الاستعلام
     tasks = query.order_by(Task.date.desc()).all()
 
-    # التعامل مع طلبات AJAX (يبقى كما هو)
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({
             'tasks': [{
@@ -300,14 +271,12 @@ def dashboard():
     return render_template('dashboard.html',
                          tasks=tasks,
                          all_employees=all_employees,
-                         all_departments=all_departments,  # ← تمرير الأقسام للقالب
+                         all_departments=all_departments,
                          is_admin=is_admin(),
                          employee_filter=employee_filter,
-                         department_filter=department_filter,  # ← الفلتر الجديد
+                         department_filter=department_filter,
                          date_filter=date_filter,
                          status_filter=status_filter)
-
-
 
 @app.route('/add_task', methods=['GET', 'POST'])
 @login_required
@@ -315,12 +284,10 @@ def add_task():
     if request.method == 'POST':
         task_name = request.form.get('task_name', '').strip()
         status = request.form.get('status', '').strip()
-        week_str = request.form.get('week', '')  # تغيير من date إلى week
+        week_str = request.form.get('week', '')
 
         try:
-            # تحويل قيمة الأسبوع (YYYY-WW) إلى تاريخ
             year, week = map(int, week_str.split('-W'))
-            # الحصول على أول يوم في الأسبوع (الاثنين)
             date = datetime.strptime(f'{year}-{week}-1', "%Y-%W-%w").date()
         except (ValueError, AttributeError):
             flash('صيغة الأسبوع غير صحيحة. يرجى اختيار أسبوع صحيح.', 'danger')
@@ -330,7 +297,7 @@ def add_task():
             task_name=task_name,
             department_id=current_user.department_id,
             status=status,
-            date=date,  # سيتم تخزين تاريخ أول يوم في الأسبوع
+            date=date,
             employee_id=current_user.id
         )
 
@@ -342,7 +309,7 @@ def add_task():
     return render_template('add_task.html', 
                          employee_name=current_user.name, 
                          department_name=current_user.department.name,
-                         current_week=datetime.now().strftime("%Y-W%W"))  # إضافة الأسبوع الحالي كقيمة افتراضية
+                         current_week=datetime.now().strftime("%Y-W%W"))
 
 @app.route('/update_status/<int:task_id>', methods=['POST'])
 @login_required
@@ -364,7 +331,6 @@ def delete_task(task_id):
     try:
         task = Task.query.get_or_404(task_id)
         
-        # التحقق من الصلاحيات باستخدام employee_id بدلاً من user_id
         if not (current_user.role in ['admin', 'manager'] or task.employee_id == current_user.id):
             flash('ليس لديك صلاحية لحذف هذه المهمة', 'danger')
             return redirect(url_for('dashboard'))
@@ -378,7 +344,6 @@ def delete_task(task_id):
         db.session.rollback()
         flash(f'حدث خطأ أثناء الحذف: {str(e)}', 'danger')
         return redirect(url_for('dashboard'))
-
 
 @app.route('/task/<int:task_id>')
 @login_required
@@ -396,18 +361,15 @@ def task_details(task_id):
 def edit_task(task_id):
     task = Task.query.get_or_404(task_id)
 
-    # تحقق من صلاحيات التعديل
     if not can_edit_task(task):
         flash("ليس لديك صلاحية للتعديل", "danger")
         return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
-        # تحديث الحقول
         task.task_name = request.form.get('task_name')
         task.status = request.form.get('status')
         task.description = request.form.get('description')
 
-        # إذا بدك تعدل التاريخ كمان:
         if request.form.get('date'):
             try:
                 task.date = datetime.strptime(request.form.get('date'), '%Y-%m-%d').date()
@@ -425,23 +387,20 @@ def edit_task(task_id):
 def run_archive():
     archive_completed_tasks()
     flash("تم أرشفة المهام المكتملة بنجاح", "success")
-    return redirect(url_for('dashboard'))  # أو أي صفحة بدك ترجع إلها
-
+    return redirect(url_for('dashboard'))
 
 @app.route('/archived_tasks', methods=['GET', 'POST'])
 @login_required
 def archived_tasks():
-    # جلب جميع الأقسام إذا كان مديراً
     departments = Department.query.all() if is_admin() else None
     employees = Employee.query.all() if is_admin() else None
 
     selected_department = request.args.get('department')
     selected_employee = request.args.get('employee')
-    selected_week = request.args.get('week')  # بصيغة YYYY-WW
+    selected_week = request.args.get('week')
 
     query = ArchivedTask.query
 
-    # فلترة حسب الصلاحيات
     if not is_admin():
         query = query.filter_by(employee_id=current_user.id)
 
@@ -466,12 +425,24 @@ def archived_tasks():
                          employees=employees,
                          is_admin=is_admin())
 
+@app.route('/teams')
+@login_required
+def teams():
+    departments = Department.query.options(
+        db.joinedload(Department.manager),
+        db.joinedload(Department.employees)
+    ).all()
+    return render_template('teams.html', departments=departments)
 
-
+# إنشاء جداول قاعدة البيانات عند التشغيل لأول مرة
+@app.before_first_request
+def create_tables():
+    db.create_all()
 
 with app.app_context():
     try:
-        db.session.execute('SELECT 1')
+        # استخدام text() للاستعلامات النصية المباشرة
+        db.session.execute(text('SELECT 1'))
         print("✅ تم الاتصال بنجاح مع قاعدة البيانات")
     except Exception as e:
         print(f"❌ فشل الاتصال: {e}")
