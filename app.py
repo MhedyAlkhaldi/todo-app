@@ -362,17 +362,23 @@ def update_status(task_id):
 @app.route('/delete_task/<int:task_id>', methods=['POST'])
 @login_required
 def delete_task(task_id):
-    task = Task.query.get_or_404(task_id)
+    try:
+        task = Task.query.get_or_404(task_id)
+        
+        # التحقق من الصلاحيات باستخدام employee_id بدلاً من user_id
+        if not (current_user.role in ['admin', 'manager'] or task.employee_id == current_user.id):
+            flash('ليس لديك صلاحية لحذف هذه المهمة', 'danger')
+            return redirect(url_for('dashboard'))
 
-    # السماح بالحذف فقط للمسؤول أو المدير أو منشئ المهمة
-    if current_user.role not in ['admin', 'manager'] and task.user_id != current_user.id:
-        flash('ليس لديك صلاحية لحذف هذه المهمة', 'danger')
+        db.session.delete(task)
+        db.session.commit()
+        flash('تم حذف المهمة بنجاح', 'success')
         return redirect(url_for('dashboard'))
-
-    db.session.delete(task)
-    db.session.commit()
-    flash('تم حذف المهمة بنجاح', 'success')
-    return redirect(url_for('dashboard'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'حدث خطأ أثناء الحذف: {str(e)}', 'danger')
+        return redirect(url_for('dashboard'))
 
 
 @app.route('/task/<int:task_id>')
