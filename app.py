@@ -427,19 +427,19 @@ def teams():
 # ------------------------------
 # إنشاء الجداول
 # ------------------------------
-@app.before_first_request
-def create_tables():
+with app.app_context():
     db.create_all()
 
 
-with app.app_context():
-    try:
+try:
+    with app.app_context():
+        db.create_all()
+        # اختبار الاتصال بقاعدة البيانات
         db.session.execute(text('SELECT 1'))
         print("✅ تم الاتصال بنجاح مع قاعدة البيانات")
-    except Exception as e:
-        print(f"❌ فشل الاتصال: {e}")
-        raise
-
+except Exception as e:
+    print(f"❌ فشل الاتصال: {e}")
+    raise
 
 if __name__ == '__main__':
     app.run(debug=True)
