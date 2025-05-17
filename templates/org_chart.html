@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-4 text-center">الهيكل التنظيمي</h1>
+    
+    <!-- شجرة المدير التنفيذي -->
+    <div class="org-tree">
+        {% set ceo = Employee.query.filter_by(role='CEO').first() %}
+        {% if ceo %}
+            <div class="ceo-card text-center mb-4">
+                <div class="employee-card" onclick="showEmployeeModal({{ ceo.id }})">
+                    {% if ceo.profile_image %}
+                        <img src="{{ url_for('static', filename='profile_images/' + ceo.profile_image) }}" 
+                             class="profile-img" alt="{{ ceo.name }}">
+                    {% else %}
+                        <img src="{{ url_for('static', filename='images/default-profile.png') }}" 
+                             class="profile-img" alt="صورة افتراضية">
+                    {% endif %}
+                    <h5>{{ ceo.name }}</h5>
+                    <p class="text-muted">{{ ceo.job_title }}</p>
+                </div>
+                
+                <!-- مدراء الأقسام -->
+                <div class="d-flex justify-content-center">
+                    {% for dept in Department.query.all() %}
+                        {% if dept.manager %}
+                            <div class="dept-level mx-3">
+                                <div class="employee-card" onclick="showEmployeeModal({{ dept.manager.id }})">
+                                    {% if dept.manager.profile_image %}
+                                        <img src="{{ url_for('static', filename='profile_images/' + dept.manager.profile_image) }}" 
+                                             class="profile-img" alt="{{ dept.manager.name }}">
+                                    {% else %}
+                                        <img src="{{ url_for('static', filename='images/default-profile.png') }}" 
+                                             class="profile-img" alt="صورة افتراضية">
+                                    {% endif %}
+                                    <h5>{{ dept.manager.name }}</h5>
+                                    <p class="text-muted">{{ dept.manager.job_title }}</p>
+                                    <small>{{ dept.name }}</small>
+                                </div>
+                                
+                                <!-- موظفو القسم -->
+                                <div class="d-flex justify-content-center">
+                                    {% for emp in dept.employees if emp.id != dept.manager.id %}
+                                        <div class="emp-level mx-2">
+                                            <div class="employee-card" onclick="showEmployeeModal({{ emp.id }})">
+                                                {% if emp.profile_image %}
+                                                    <img src="{{ url_for('static', filename='profile_images/' + emp.profile_image) }}" 
+                                                         class="profile-img-sm" alt="{{ emp.name }}">
+                                                {% else %}
+                                                    <img src="{{ url_for('static', filename='images/default-profile.png') }}" 
+                                                         class="profile-img-sm" alt="صورة افتراضية">
+                                                {% endif %}
+                                                <h6>{{ emp.name }}</h6>
+                                                <small class="text-muted">{{ emp.job_title }}</small>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal لعرض تفاصيل الموظف -->
+<div class="modal fade" id="employeeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">تفاصيل الموظف</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="employeeDetails">
+                <!-- سيتم ملؤه بالجافاسكريبت -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .org-tree {
+        text-align: center;
+    }
+    .employee-card {
+        cursor: pointer;
+        padding: 15px;
+        border-radius: 10px;
+        background: #f8f9fa;
+        transition: all 0.3s;
+        margin-bottom: 15px;
+    }
+    .employee-card:hover {
+        background: #e9ecef;
+        transform: translateY(-5px);
+    }
+    .profile-img {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid #dee2e6;
+    }
+    .profile-img-sm {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #dee2e6;
+    }
+    .dept-level {
+        display: inline-block;
+        vertical-align: top;
+    }
+    .emp-level {
+        display: inline-block;
+    }
+</style>
+
+<script>
+function showEmployeeModal(employeeId) {
+    fetch(`/employee/${employeeId}/details`)
+        .then(response => response.json())
+        .then(data => {
+            const modalContent = `
+                <div class="text-center">
+                    <img src="${data.profile_image ? 
+                        '/static/profile_images/' + data.profile_image : 
+                        '/static/images/default-profile.png'}" 
+                         class="profile-img mb-3" alt="${data.name}">
+                    <h4>${data.name}</h4>
+                    <p><strong>المنصب:</strong> ${data.job_title}</p>
+                    <p><strong>القسم:</strong> ${data.department}</p>
+                    <p><strong>البلد:</strong> ${data.country}</p>
+                    <p><strong>الهاتف:</strong> ${data.phone}</p>
+                    <p><strong>الإيميل:</strong> ${data.email}</p>
+                </div>
+            `;
+            document.getElementById('employeeDetails').innerHTML = modalContent;
+            var modal = new bootstrap.Modal(document.getElementById('employeeModal'));
+            modal.show();
+        });
+}
+</script>
+{% endblock %}

@@ -64,6 +64,8 @@ class Employee(UserMixin, db.Model):
     role = db.Column(db.String(50), default='employee')
     manager_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=True)
     manager = db.relationship('Employee', remote_side=[id], backref='subordinates')
+    country = db.Column(db.String(100))  # إضافة حقل البلد
+    profile_image = db.Column(db.String(255))  # مسار ملف الصورة
 
     def get_role(self):
         return self.role
@@ -423,7 +425,27 @@ def teams():
     ).all()
     return render_template('teams.html', departments=departments)
 
+@app.route('/org_chart')
+@login_required
+def org_chart():
+    return render_template('org_chart.html')
 
+@app.route('/employee/<int:employee_id>/details')
+@login_required
+def employee_details(employee_id):
+    employee = Employee.query.get_or_404(employee_id)
+    return jsonify({
+        'name': employee.name,
+        'job_title': employee.job_title,
+        'department': employee.department.name,
+        'country': employee.country,
+        'phone': employee.phone,
+        'email': employee.email,
+        'profile_image': employee.profile_image
+    })
+    
+    
+    
 # ------------------------------
 # إنشاء الجداول
 # ------------------------------
