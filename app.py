@@ -430,19 +430,6 @@ def teams():
 def org_chart():
     return render_template('org_chart.html')
 
-@app.route('/employee/<int:employee_id>/details')
-@login_required
-def employee_details(employee_id):
-    employee = Employee.query.get_or_404(employee_id)
-    return jsonify({
-        'name': employee.name,
-        'job_title': employee.job_title,
-        'department': employee.department.name,
-        'country': employee.country,
-        'phone': employee.phone,
-        'email': employee.email,
-        'profile_image': employee.profile_image
-    })
     
     
     

@@ -13,9 +13,17 @@ postgresql://postgres:C_FKf4_uN.2fwH-@db.zidmmheurkweuwoasrfg.supabase.co:5432/t
 طريقة push على ريندر
 
 git add .
-git commit -m "Fix database URI to use environment variable"
+git commit -m "Org chart"
 git push
 
 C_FKf4_uN.2fwH-
 
-railway: gZAqNHnNEHRbrRDZQLoQqrGFLNKjWEHF
+railway pass: gZAqNHnNEHRbrRDZQLoQqrGFLNKjWEHF
+
+git commit -m "تسجيل الدخول وصلاحيات العرض3"
+
+postgresql://postgres:gZAqNHnNEHRbrRDZQLoQqrGFLNKjWEHF@hopper.proxy.rlwy.net:10727/railway
+
+الترحيل
+flask db migrate -m "Initial migration"
+flask db upgrade
