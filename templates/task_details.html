@@ -88,17 +88,21 @@
                         <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
                             <i class="bi bi-arrow-right"></i> رجوع
                         </a>
+
+                        {% if current_user.id == task.employee_id %}
                         <div>
                             <a href="{{ url_for('edit_task', task_id=task.id) }}" class="btn btn-warning me-2">
                                 <i class="bi bi-pencil"></i> تعديل
                             </a>
                             <a href="{{ url_for('delete_task', task_id=task.id) }}" 
-                               class="btn btn-danger"
-                               onclick="return confirm('هل أنت متأكد من حذف هذه المهمة؟')">
+                            class="btn btn-danger"
+                            onclick="return confirm('هل أنت متأكد من حذف هذه المهمة؟')">
                                 <i class="bi bi-trash"></i> حذف
                             </a>
                         </div>
+                        {% endif %}
                     </div>
+
                 </div>
             </div>
         </div>

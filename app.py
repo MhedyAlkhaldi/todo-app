@@ -325,8 +325,10 @@ def dashboard():
 def add_task():
     if request.method == 'POST':
         task_name = request.form.get('task_name', '').strip()
+        description = request.form.get('description', '').strip()  # ✅ تم إضافته
         status = request.form.get('status', '').strip()
         week_str = request.form.get('week', '')
+
         try:
             year, week = map(int, week_str.split('-W'))
             date_val = datetime.strptime(f'{year}-{week}-1', "%Y-%W-%w").date()
@@ -336,6 +338,7 @@ def add_task():
 
         new_task = Task(
             task_name=task_name,
+            description=description,  # ✅ تم إضافته هنا
             department_id=current_user.department_id,
             status=status,
             date=date_val,
@@ -346,10 +349,13 @@ def add_task():
         flash('تمت إضافة المهمة بنجاح', 'success')
         return redirect(url_for('dashboard'))
 
-    return render_template('add_task.html',
-                           employee_name=current_user.name,
-                           department_name=current_user.department.name,
-                           current_week=datetime.now().strftime("%Y-W%W"))
+    return render_template(
+        'add_task.html',
+        employee_name=current_user.name,
+        department_name=current_user.department.name,
+        current_week=datetime.now().strftime("%Y-W%W")
+    )
+
 
 
 @app.route('/update_status/<int:task_id>', methods=['POST'])
@@ -387,10 +393,8 @@ def delete_task(task_id):
 @login_required
 def task_details(task_id):
     task = Task.query.get_or_404(task_id)
-    if not is_admin() and task.employee_id != current_user.id:
-        flash("ليس لديك صلاحية لعرض هذه المهمة", "danger")
-        return redirect(url_for('dashboard'))
     return render_template('task_details.html', task=task)
+
 
 
 @app.route('/edit_task/<int:task_id>', methods=['GET', 'POST'])
