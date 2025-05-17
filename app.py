@@ -18,6 +18,8 @@ from flask_login import current_user
 # تهيئة التطبيق
 app = Flask(__name__)
 
+    
+    
 # إعدادات الأمان
 app.config['SECRET_KEY'] = secrets.token_hex(32)
 csrf = CSRFProtect(app)
