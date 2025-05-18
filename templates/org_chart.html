@@ -212,8 +212,16 @@ function showEmployeeModal(employeeId) {
                     <p><strong>المنصب:</strong> ${data.job_title}</p>
                     <p><strong>القسم:</strong> ${data.department}</p>
                     <p><strong>البلد:</strong> ${data.country}</p>
-                    <p><strong>الهاتف:</strong> ${data.phone}</p>
-                    <p><strong>الإيميل:</strong> ${data.email}</p>
+                    <p><strong>الهاتف:</strong> 
+  <a href="https://wa.me/${data.phone.replace(/[^0-9]/g, '')}" target="_blank">
+    ${data.phone}
+  </a>
+</p>
+                    <p><strong>الإيميل:</strong> 
+  <a href="https://mail.google.com/mail/?view=cm&fs=1&to=${data.email}" target="_blank">
+    ${data.email}
+  </a>
+</p>
                 </div>
             `;
             document.getElementById('employeeDetails').innerHTML = modalContent;
