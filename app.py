@@ -12,7 +12,10 @@ from sqlalchemy import text
 from flask_wtf.csrf import generate_csrf
 from sqlalchemy import text
 import re
-
+import pandas as pd
+import io
+from sqlalchemy import text  # 👈 هذا السطر مهم جداً
+from flask import request, send_file
 
 
 
@@ -551,6 +554,91 @@ def employee_details(employee_id):
     return jsonify(data)
 
 
+@app.route('/export_tasks')
+@login_required
+def export_tasks():
+    # الفلاتر القادمة من شريط العنوان
+    employee_id   = request.args.get('employee_filter')
+    department_id = request.args.get('department_filter')
+    date_filter   = request.args.get('date_filter')
+    status_filter = request.args.get('status_filter')
+
+    # نصّ الاستعلام مع JOIN على الجداول الصحيحة
+    sql = """
+        SELECT 
+            e.name              AS employee_name,
+            d.name              AS department_name,
+            t.task_name,
+            t.description,
+            t.status,
+            t.date
+        FROM task t
+        JOIN employee   e ON t.employee_id   = e.id
+        LEFT JOIN department d ON e.department_id = d.id
+        WHERE 1=1            -- سنضيف عليه الشروط ديناميكيًا
+    """
+    params = {}
+
+    # إذا كان المستخدم موظفًا عاديًا: يصدِّر فقط مهامه
+    if current_user.role == 'employee':
+        sql += " AND e.id = :cur_emp_id"
+        params['cur_emp_id'] = current_user.id
+    # أمّا لو أدمن أو HR فيمكنه اختيار موظف محدَّد إن وُجد فلتر employee_filter
+    elif employee_id:
+        sql += " AND e.id = :emp_id"
+        params['emp_id'] = employee_id
+
+    # فلتر القسم (إن وجد)
+    if department_id:
+        sql += " AND d.id = :dept_id"
+        params['dept_id'] = department_id
+
+    # فلتر التاريخ
+    if date_filter:
+        sql += " AND t.date = :date_f"
+        params['date_f'] = date_filter
+
+    # فلتر الحالة
+    if status_filter:
+        sql += " AND t.status = :status_f"
+        params['status_f'] = status_filter
+
+    # تنفيذ الاستعلام
+    rows = db.session.execute(text(sql), params).fetchall()
+
+    # إعداد البيانات لـ Excel
+    data = [{
+        'اسم الموظف':   r.employee_name,
+        'القسم':        r.department_name,
+        'اسم المهمة':   r.task_name,
+        'الوصف':        r.description,
+        'الحالة':       r.status,
+        'التاريخ':      r.date.strftime('%Y-%m-%d') if r.date else ''
+    } for r in rows]
+
+    df = pd.DataFrame(data)
+
+    # إنشاء ملف إكسل في الذاكرة
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='المهام')
+
+    output.seek(0)
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name='tasks.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
+@app.route('/get_employees_by_department/<int:department_id>')
+@login_required
+def get_employees_by_department(department_id):
+    employees = Employee.query.filter_by(department_id=department_id).all()
+    return jsonify([
+        {'id': emp.id, 'name': emp.name}
+        for emp in employees
+    ])
     
     
     
