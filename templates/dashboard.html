@@ -482,7 +482,7 @@
                         <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
                             <i class="bi bi-funnel"></i> تصفية
                         </button>
-                        <a href="{{ url_for('export_tasks') }}" class="btn btn-success btn-sm">
+                        <a href="#" onclick="exportFilteredTasks()" class="btn btn-success btn-sm">
                             <i class="bi bi-file-earmark-excel"></i> تصدير
                         </a>
                     </div>
@@ -500,7 +500,7 @@
                     <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
                         <i class="bi bi-funnel"></i> تصفية
                     </button>
-                    <a href="{{ url_for('export_tasks') }}" class="btn btn-success btn-sm">
+                    <a href="#" onclick="exportFilteredTasks()" class="btn btn-success btn-sm">
                         <i class="bi bi-file-earmark-excel"></i> تصدير
                     </a>
                 </div>
@@ -846,6 +846,33 @@
             // تحديث الوقت النسبي كل دقيقة
             setInterval(formatRelativeTime, 60000);
         });
+        // دالة التصدير إلى إكسل (المعدلة لتصدير المهام المفلترة فقط)
+            function exportFilteredTasks() {
+                // الحصول على معاملات التصفية الحالية من URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const departmentFilter = urlParams.get('department_filter');
+                const employeeFilter = urlParams.get('employee_filter');
+                const statusFilter = urlParams.get('status_filter');
+                const dateFilter = urlParams.get('date_filter');
+                const weekFilter = urlParams.get('week');
+
+                // بناء رابط التصدير مع نفس معاملات التصفية
+                let exportUrl = "{{ url_for('export_tasks') }}?";
+                
+                if (departmentFilter) exportUrl += `department_filter=${departmentFilter}&`;
+                if (employeeFilter) exportUrl += `employee_filter=${employeeFilter}&`;
+                if (statusFilter) exportUrl += `status_filter=${statusFilter}&`;
+                if (dateFilter) exportUrl += `date_filter=${dateFilter}&`;
+                if (weekFilter) exportUrl += `week=${weekFilter}&`;
+
+                // إزالة علامة & الأخيرة إذا وجدت
+                exportUrl = exportUrl.replace(/&$/, '');
+
+                // توجيه المستخدم إلى رابط التصدير
+                window.location.href = exportUrl;
+            }
+            
+        
     </script>
 </body>
 </html>
