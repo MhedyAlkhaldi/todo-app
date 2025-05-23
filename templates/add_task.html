@@ -4,210 +4,548 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>إضافة مهمة جديدة</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
     <style>
         body {
-            font-family: 'Tahoma', Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f8f9fa;
+            overflow: visible !important;
+            contain: none !important;
         }
+        
+        /* تنسيقات شريط التنقل */
         .navbar {
-            box-shadow: 0 2px 4px rgba(0,0,0,.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            background-color: #fff;
         }
+        
+        .navbar-brand {
+            font-weight: 600;
+        }
+        
+        /* تنسيقات البطاقات */
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+            border: none;
+        }
+        
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            font-weight: 600;
+        }
+        
+        .card-body {
+            position: relative !important;
+            overflow: visible !important;
+            z-index: auto !important;
+        }
+        
+        /* تنسيقات الأزرار */
+        .btn-primary {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        
+        .btn-primary:hover {
+            background-color: #0b5ed7;
+            border-color: #0a58ca;
+        }
+        
+        /* تنسيقات حالة المهمة */
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            min-width: 90px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .status-pending {
+            background-color: #FFF3CD;
+            color: #856404;
+            border: 1px solid #FFEEBA;
+        }
+        
+        .status-in-progress {
+            background-color: #FFFFFF;
+            color: #0D6EFD;
+            border: 1px solid #CFE2FF;
+            box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.1);
+        }
+        
+        .status-completed {
+            background-color: #D1E7DD;
+            color: #0F5132;
+            border: 1px solid #BADBCC;
+        }
+        
+        .status-cancelled {
+            background-color: #F8D7DA;
+            color: #842029;
+            border: 1px solid #F5C2C7;
+        }
+        
+        /* تنسيقات الإشعارات بأسلوب فيسبوك */
+        .notifications-dropdown {
+            width: 360px;
+            padding: 0;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .notifications-header {
+            padding: 12px 16px;
+            font-weight: 700;
+            font-size: 18px;
+            border-bottom: 1px solid #e4e6eb;
+            background-color: #fff;
+            border-radius: 8px 8px 0 0;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        
+        .notifications-footer {
+            padding: 8px 16px;
+            text-align: center;
+            border-top: 1px solid #e4e6eb;
+            background-color: #fff;
+            border-radius: 0 0 8px 8px;
+            position: sticky;
+            bottom: 0;
+        }
+        
+        .notifications-footer a {
+            color: #1877f2;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        
+        .notifications-footer a:hover {
+            text-decoration: underline;
+        }
+        
+        .notification-item {
+            padding: 8px 16px;
+            border-bottom: 1px solid #f0f2f5;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.2s;
+            text-decoration: none;
+            color: #050505;
+        }
+        
+        .notification-item:hover {
+            background-color: #f0f2f5;
+        }
+        
+        .notification-item.unread {
+            background-color: #e7f3ff;
+        }
+        
+        .notification-item.unread:hover {
+            background-color: #dbeeff;
+        }
+        
+        .notification-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 12px;
+            flex-shrink: 0;
+        }
+        
+        .notification-icon.overdue {
+            background-color: #f5c2c7;
+            color: #842029;
+        }
+        
+        .notification-icon.tag {
+            background-color: #cfe2ff;
+            color: #084298;
+        }
+        
+        .notification-content {
+            flex-grow: 1;
+        }
+        
+        .notification-text {
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+        
+        .notification-time {
+            font-size: 12px;
+            color: #65676b;
+        }
+        
+        .notification-badge {
+            position: absolute;
+            top: 0;
+            left: 5px;
+            background-color: #e41e3f;
+            color: white;
+            border-radius: 50%;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        
+        .notification-bell {
+            position: relative;
+        }
+        
+        .no-notifications {
+            padding: 16px;
+            text-align: center;
+            color: #65676b;
+            font-size: 14px;
+        }
+        
+        /* تنسيقات نموذج إضافة المهمة */
         .form-container {
             background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,.1);
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
             padding: 25px;
-            margin-top: 30px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            border: none;
         }
-        .status-badge {
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-weight: 500;
+        
+        /* تنسيقات حقول النموذج */
+        .form-label.required:after {
+            content: " *";
+            color: #dc3545;
         }
-        .badge-pending {
-            background-color: #ffeeba;
-            color: #856404;
+        
+        /* تنسيقات Select2 */
+        .select2-container--default .select2-selection--multiple .select2-selection__choice {
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            padding: 2px 8px;
+            border-radius: 4px;
         }
-        .badge-in-progress {
-            background-color: #bee5eb;
-            color: #0c5460;
+        
+        .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+            color: white;
+            margin-right: 5px;
         }
-        .badge-completed {
-            background-color: #c3e6cb;
-            color: #155724;
+        
+        .select2-container--default .select2-selection--multiple {
+            border-color: #ced4da;
         }
-        .badge-postponed {
-            background-color: #d6d8db;
-            color: #383d41;
-        }
-        .badge-cancelled {
-            background-color: #f5c6cb;
-            color: #721c24;
+        
+        /* تنسيقات عناوين الأقسام */
+        .section-title {
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            padding-bottom: 8px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            color: #495057;
         }
     </style>
 </head>
 <body>
 
 <!-- شريط التنقل -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<nav class="navbar navbar-expand-lg navbar-light bg-white">
     <div class="container">
-        <a class="navbar-brand" href="/dashboard">
-            <i class="bi bi-speedometer2"></i> لوحة التحكم
-        </a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-            aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <a class="navbar-brand" href="#">نظام إدارة المهام</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
             <span class="navbar-toggler-icon"></span>
         </button>
-
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav me-auto">
                 <li class="nav-item">
-                    <a class="nav-link active" href="/dashboard"><i class="bi bi-list-task"></i> المهام</a>
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">لوحة التحكم</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/archived_tasks"><i class="bi bi-archive"></i> أرشيف المهام</a>
+                    <a class="nav-link active" href="{{ url_for('add_task') }}">إضافة مهمة</a>
                 </li>
-                {% if is_admin %}
                 <li class="nav-item">
-                    <a class="nav-link" href="/admin"><i class="bi bi-person-gear"></i> لوحة المدير</a>
+                    <a class="nav-link" href="{{ url_for('archived_tasks') }}">المهام المؤرشفة</a>
+                </li>
+                {% if is_admin() %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('org_chart') }}">الهيكل التنظيمي</a>
                 </li>
                 {% endif %}
             </ul>
             <ul class="navbar-nav">
-                <li class="nav-item">
-                    <a class="nav-link" href="/add_task"><i class="bi bi-plus-circle"></i> إضافة مهمة</a>
+                <!-- قائمة الإشعارات بأسلوب فيسبوك -->
+                <li class="nav-item dropdown notification-bell">
+                    <a class="nav-link dropdown-toggle" href="#" id="notificationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-bell-fill fs-5"></i>
+                        {% set unread_count = notifications|selectattr('is_read', 'equalto', false)|list|length %}
+                        {% if unread_count > 0 %}
+                        <span class="notification-badge">{{ unread_count }}</span>
+                        {% endif %}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end notifications-dropdown">
+                        <li class="notifications-header">الإشعارات</li>
+                        
+                        {% if notifications %}
+                            {% for notification in notifications %}
+                            <li>
+                                <a href="{{ url_for('task_details', task_id=notification.task_id) }}" 
+                                   class="notification-item {% if not notification.is_read %}unread{% endif %}"
+                                   onclick="markNotificationRead({{ notification.id }}, event)">
+                                    <div class="notification-icon {% if notification.notification_type == 'overdue' %}overdue{% elif notification.notification_type == 'tag' %}tag{% endif %}">
+                                        {% if notification.notification_type == 'overdue' %}
+                                            <i class="bi bi-exclamation-triangle-fill"></i>
+                                        {% elif notification.notification_type == 'tag' %}
+                                            <i class="bi bi-at"></i>
+                                        {% else %}
+                                            <i class="bi bi-info-circle-fill"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div class="notification-content">
+                                        <div class="notification-text">{{ notification.message }}</div>
+                                        <div class="notification-time" data-timestamp="{{ notification.timestamp.timestamp() }}">
+                                            {{ notification.timestamp.strftime('%Y-%m-%d %H:%M') }}
+                                        </div>
+                                    </div>
+                                </a>
+                            </li>
+                            {% endfor %}
+                        {% else %}
+                            <li class="no-notifications">لا توجد إشعارات</li>
+                        {% endif %}
+                        
+                        <li class="notifications-footer">
+                            <a href="{{ url_for('notifications') }}">عرض جميع الإشعارات</a>
+                        </li>
+                    </ul>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/org_chart"><i class="bi bi-diagram-3"></i> الهيكل التنظيمي</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/logout"><i class="bi bi-box-arrow-left"></i> تسجيل الخروج</a>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-person-circle"></i> {{ current_user.name }}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('logout') }}">تسجيل الخروج</a></li>
+                    </ul>
                 </li>
             </ul>
         </div>
     </div>
 </nav>
 
-<div class="container">
+<div class="container mt-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <!-- عرض الرسائل -->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }} alert-dismissible fade show mt-3">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0">
+                        <i class="bi bi-plus-circle"></i> إضافة مهمة جديدة
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('add_task') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-            <div class="form-container">
-                <h2 class="mb-4 text-center">
-                    <i class="bi bi-plus-circle"></i> إضافة مهمة جديدة
-                </h2>
-                
-                <form method="POST" action="{{ url_for('add_task') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-                    <!-- معلومات المهمة -->
-                    <div class="mb-4">
-                        <h5 class="border-bottom pb-2">معلومات المهمة</h5>
-                        <div class="mb-3">
-                            <label for="task_name" class="form-label">اسم المهمة <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="task_name" name="task_name" required>
-                        </div>
-                    </div>
-
-                    <!-- معلومات الموظف والقسم -->
-                    <div class="mb-4">
-                        <h5 class="border-bottom pb-2">معلومات التنفيذ</h5>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="employee_name" class="form-label">الموظف</label>
-                                <input type="text" class="form-control" value="{{ current_user.name }}" readonly>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="department" class="form-label">القسم</label>
-                                <input type="text" class="form-control" value="{{ current_user.department.name }}" readonly>
+                        <!-- معلومات المهمة -->
+                        <div class="mb-4">
+                            <h5 class="section-title">معلومات المهمة</h5>
+                            <div class="mb-3">
+                                <label for="task_name" class="form-label required">اسم المهمة</label>
+                                <input type="text" class="form-control" id="task_name" name="task_name" required>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- حالة المهمة وتاريخها -->
-                    <div class="mb-4">
-                        <h5 class="border-bottom pb-2">حالة المهمة</h5>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="status" class="form-label">الحالة <span class="text-danger">*</span></label>
-                                <select class="form-select" id="status" name="status" required>
-                                    <option value="قيد التنفيذ">
-                                        <span class="status-badge badge-pending">قيد التنفيذ</span>
-                                    </option>
-                                    <option value="جاري العمل">
-                                        <span class="status-badge badge-in-progress">جاري العمل</span>
-                                    </option>
-                                    <option value="مكتمل">
-                                        <span class="status-badge badge-completed">مكتمل</span>
-                                    </option>
-                                    <option value="مؤجل">
-                                        <span class="status-badge badge-postponed">مؤجل</span>
-                                    </option>
-                                    <option value="ملغى">
-                                        <span class="status-badge badge-cancelled">ملغى</span>
-                                    </option>
+                        <!-- معلومات الموظف والقسم -->
+                        <div class="mb-4">
+                            <h5 class="section-title">معلومات التنفيذ</h5>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="employee_name" class="form-label">الموظف</label>
+                                    <input type="text" class="form-control" value="{{ current_user.name }}" readonly>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="department" class="form-label">القسم</label>
+                                    <input type="text" class="form-control" value="{{ current_user.department.name }}" readonly>
+                                </div>
+                            </div>
+                            
+                            <!-- إضافة حقل تاغ الموظفين -->
+                            <div class="mb-3">
+                                <label for="tagged_employees" class="form-label">
+                                    <i class="bi bi-tags"></i> إضافة تاغ للموظفين
+                                </label>
+                                <select class="form-select select2-multiple" id="tagged_employees" name="tagged_employees" multiple>
+                                    {% for employee in employees %}
+                                    <option value="{{ employee.id }}">{{ employee.name }}</option>
+                                    {% endfor %}
                                 </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="week" class="form-label">الأسبوع</label>
-                                <input type="week" class="form-control" id="week" name="week" 
-                                       value="{{ request.args.get('week') }}">
+                                <div class="form-text text-muted">
+                                    يمكنك اختيار موظف أو أكثر لإرسال إشعار لهم بهذه المهمة
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- ملاحظات إضافية -->
-                    <div class="mb-4">
-                        <h5 class="border-bottom pb-2">تفاصيل إضافية</h5>
-                        <div class="mb-3">
-                            <label for="description" class="form-label">وصف المهمة</label>
-                           <textarea name="description" id="description" class="form-control" rows="3"></textarea>
+                        <!-- حالة المهمة وتاريخها -->
+                        <div class="mb-4">
+                            <h5 class="section-title">حالة المهمة</h5>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="status" class="form-label required">الحالة</label>
+                                    <select class="form-select" id="status" name="status" required>
+                                        <option value="قيد التنفيذ">قيد التنفيذ</option>
+                                        <option value="جاري العمل">جاري العمل</option>
+                                        <option value="مكتمل">مكتمل</option>
+                                        <option value="مؤجل">مؤجل</option>
+                                        <option value="ملغى">ملغى</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="week" class="form-label">الأسبوع</label>
+                                    <input type="week" class="form-control" id="week" name="week" 
+                                           value="{{ current_week }}">
+                                </div>
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- أزرار التحكم -->
-                    <div class="d-flex justify-content-between mt-4">
-                        <a href="/dashboard" class="btn btn-outline-secondary">
-                            <i class="bi bi-arrow-right"></i> رجوع
-                        </a>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-save"></i> حفظ المهمة
-                        </button>
-                    </div>
-                </form>
+                        <!-- ملاحظات إضافية -->
+                        <div class="mb-4">
+                            <h5 class="section-title">تفاصيل إضافية</h5>
+                            <div class="mb-3">
+                                <label for="description" class="form-label">وصف المهمة</label>
+                               <textarea name="description" id="description" class="form-control" rows="3"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- أزرار التحكم -->
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-right"></i> رجوع
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> حفظ المهمة
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
-    // تعيين تاريخ اليوم كقيمة افتراضية
-    document.addEventListener('DOMContentLoaded', function() {
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('date').value = today;
+    // دالة لتعليم الإشعار كمقروء
+    function markNotificationRead(notificationId, event) {
+        event.preventDefault();
         
-        // إضافة تأثيرات للخيارات في القائمة المنسدلة
-        const statusSelect = document.getElementById('status');
-        statusSelect.addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            // يمكنك إضافة أي تأثيرات إضافية هنا
+        const link = event.currentTarget;
+        
+        fetch(`/mark_notification_read/${notificationId}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token() }}',
+                'Content-Type': 'application/json'
+            }
+        }).then(response => {
+            if (response.ok) {
+                link.classList.remove('unread');
+                updateUnreadCount();
+                window.location.href = link.href;
+            }
         });
+    }
+
+    // تحديث عدد الإشعارات غير المقروءة
+    function updateUnreadCount() {
+        const unreadItems = document.querySelectorAll('.notification-item.unread');
+        const badge = document.querySelector('.notification-badge');
+        
+        if (unreadItems.length > 0) {
+            if (badge) {
+                badge.textContent = unreadItems.length;
+            } else {
+                const bell = document.querySelector('.notification-bell .nav-link');
+                const newBadge = document.createElement('span');
+                newBadge.className = 'notification-badge';
+                newBadge.textContent = unreadItems.length;
+                bell.appendChild(newBadge);
+            }
+        } else if (badge) {
+            badge.remove();
+        }
+    }
+
+    // تنسيق الوقت النسبي
+    function formatRelativeTime() {
+        const timeElements = document.querySelectorAll('.notification-time');
+        const now = new Date().getTime() / 1000;
+        
+        timeElements.forEach(element => {
+            const timestamp = parseFloat(element.getAttribute('data-timestamp'));
+            const diff = now - timestamp;
+            
+            let timeText;
+            if (diff < 60) {
+                timeText = 'منذ لحظات';
+            } else if (diff < 3600) {
+                const minutes = Math.floor(diff / 60);
+                timeText = `منذ ${minutes} ${minutes === 1 ? 'دقيقة' : 'دقائق'}`;
+            } else if (diff < 86400) {
+                const hours = Math.floor(diff / 3600);
+                timeText = `منذ ${hours} ${hours === 1 ? 'ساعة' : 'ساعات'}`;
+            } else if (diff < 604800) {
+                const days = Math.floor(diff / 86400);
+                timeText = `منذ ${days} ${days === 1 ? 'يوم' : 'أيام'}`;
+            } else {
+                const date = new Date(timestamp * 1000);
+                timeText = date.toLocaleDateString('ar-SA');
+            }
+            
+            element.textContent = timeText;
+        });
+    }
+
+    // تهيئة Select2 للتاغ
+    $(document).ready(function() {
+        $('.select2-multiple').select2({
+            placeholder: "اختر الموظفين للإشارة إليهم...",
+            allowClear: true,
+            dir: "rtl",
+            language: "ar"
+        });
+        
+        // تنسيق الوقت النسبي إذا كانت هناك إشعارات
+        if (document.querySelectorAll('.notification-time').length > 0) {
+            formatRelativeTime();
+            
+            // تحديث الوقت النسبي كل دقيقة
+            setInterval(formatRelativeTime, 60000);
+        }
     });
 </script>
-
 </body>
 </html>

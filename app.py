@@ -1,23 +1,20 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session
+from flask import Flask, render_template, redirect, url_for, flash, request, session, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import secrets
 import os
 from urllib.parse import quote_plus
-from sqlalchemy import text
 from flask_wtf.csrf import generate_csrf
-from sqlalchemy import text
 import re
 import pandas as pd
 import io
-from sqlalchemy import text  # 👈 هذا السطر مهم جداً
+from sqlalchemy import text, or_, and_
 from flask import request, send_file
-
-
+import itertools
 
 # ------------------------------
 # إعداد التطبيق
@@ -94,6 +91,23 @@ class Employee(UserMixin, db.Model):
 
     tasks = db.relationship('Task', back_populates='employee', foreign_keys='Task.employee_id')
     archived_tasks = db.relationship('ArchivedTask', back_populates='employee', foreign_keys='ArchivedTask.employee_id')
+    
+    # العلاقة مع المهام التي تم وضع تاغ للموظف فيها
+    tagged_tasks = db.relationship('TaskTag', back_populates='employee')
+
+
+# جدول العلاقة بين المهام والموظفين المشار إليهم (تاغ)
+class TaskTag(db.Model):
+    __tablename__ = 'task_tag'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # العلاقات
+    task = db.relationship('Task', back_populates='tagged_employees')
+    employee = db.relationship('Employee', back_populates='tagged_tasks')
 
 
 class Task(db.Model):
@@ -111,7 +125,21 @@ class Task(db.Model):
     status = db.Column(db.String(50), nullable=False)
     date = db.Column(db.Date, nullable=False)
     description = db.Column(db.Text, nullable=True)
+    
+    # العلاقة مع الموظفين المشار إليهم (تاغ)
+    tagged_employees = db.relationship('TaskTag', back_populates='task', cascade='all, delete-orphan')
 
+    @property
+    def is_overdue(self):
+        return self.date < date.today() and self.status != 'مكتمل'
+        
+    @property
+    def is_important(self):
+        # تحديد ما إذا كانت المهمة مهمة بناءً على معايير معينة
+        # مثال: المهام التي تأخرت أكثر من 3 أيام أو المهام التي لها أولوية عالية
+        today = date.today()
+        days_overdue = (today - self.date).days if self.date < today else 0
+        return days_overdue > 3 or 'مهم' in self.task_name.lower() or 'عاجل' in self.task_name.lower()
 
 
 class ArchivedTask(db.Model):
@@ -131,7 +159,21 @@ class ArchivedTask(db.Model):
     status = db.Column(db.String(50))
     date = db.Column(db.Date)
     description = db.Column(db.Text)
-
+    
+    
+class Notification(db.Model):
+    __tablename__ = 'notification'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'))
+    task_id = db.Column(db.Integer, db.ForeignKey('task.id'))
+    message = db.Column(db.String(500))
+    is_read = db.Column(db.Boolean, default=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # العلاقات
+    employee = db.relationship('Employee', backref='notifications', foreign_keys=[employee_id])
+    task = db.relationship('Task', backref='notifications', foreign_keys=[task_id])
 
 
 
@@ -179,6 +221,15 @@ def get_tasks_for_user(user):
         return Task.query.filter(Task.employee_id.in_([sub.id for sub in user.subordinates])).all()
     else:
         return Task.query.filter_by(employee_id=user.id).all()
+
+
+# إضافة الدوال المساعدة إلى سياق القالب
+@app.context_processor
+def utility_processor():
+    return dict(
+        is_admin=is_admin,
+        can_edit_task=can_edit_task
+    )
 
 
 # ------------------------------
@@ -263,29 +314,27 @@ def logout():
     return redirect(url_for('login'))
 
 
-from datetime import datetime, timedelta
-import re
-
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    # جلب البيانات الأساسية
     all_departments = Department.query.all()
     all_employees = Employee.query.options(db.joinedload(Employee.department)).all() if is_admin() else []
 
-    # الفلاتر من الطلب
+    # معالجة الفلاتر
     date_filter = request.args.get('date_filter')
     status_filter = request.args.get('status_filter')
     employee_filter = request.args.get('employee_filter')
     department_filter = request.args.get('department_filter')
     week_filter = request.args.get('week')
 
-    # بداية الاستعلام
+    # بناء الاستعلام الأساسي
     query = Task.query.options(
         db.joinedload(Task.employee),
         db.joinedload(Task.department)
     )
 
-    # تصفية حسب المستخدم الحالي
+    # تطبيق الفلاتر
     if is_admin():
         if employee_filter and employee_filter.isdigit():
             query = query.filter(Task.employee_id == int(employee_filter))
@@ -296,11 +345,9 @@ def dashboard():
             Task.employee_id == current_user.id
         ))
 
-    # فلترة حسب القسم
     if department_filter and department_filter.isdigit():
         query = query.filter(Task.department_id == int(department_filter))
 
-    # فلترة حسب التاريخ (يوم واحد)
     if date_filter:
         try:
             parsed_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
@@ -308,356 +355,558 @@ def dashboard():
         except ValueError:
             pass
 
-    # فلترة حسب الأسبوع (من السبت إلى الجمعة)
+    # فلترة حسب الأسبوع
     start_of_week = end_of_week = None
     if week_filter:
         match = re.match(r"(\d{4})-W(\d{2})", week_filter)
         if match:
             year, week = int(match.group(1)), int(match.group(2))
             try:
-                # نحصل على الإثنين كبداية ISO، ثم نرجع ليوم السبت
                 monday = datetime.strptime(f"{year}-W{week}-1", "%G-W%V-%u").date()
-                start_of_week = monday - timedelta(days=2)
+                start_of_week = monday - timedelta(days=2)  # السبت بدلاً من الإثنين
                 end_of_week = start_of_week + timedelta(days=6)
                 query = query.filter(Task.date.between(start_of_week, end_of_week))
             except ValueError:
                 pass
 
-    # فلترة حسب الحالة
     if status_filter:
         query = query.filter(Task.status == status_filter)
 
+    # جلب المهام المصفاة
     tasks = query.order_by(Task.date.desc()).all()
 
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return jsonify({
-            'tasks': [{
-                'id': task.id,
-                'task_name': task.task_name,
-                'employee': {'name': task.employee.name},
-                'department': {'name': task.department.name},
-                'status': task.status,
-                'date': task.date.strftime('%Y-%m-%d')
-            } for task in tasks]
-        })
+    # معالجة المهام المتأخرة وإنشاء الإشعارات
+    today = date.today()
+    overdue_tasks = Task.query.filter(
+        Task.status != 'مكتمل',
+        Task.date < today
+    ).options(
+        db.joinedload(Task.employee)
+    ).all()
 
-    return render_template('dashboard.html',
-                           tasks=tasks,
-                           all_employees=all_employees,
-                           all_departments=all_departments,
-                           is_admin=is_admin(),
-                           employee_filter=employee_filter,
-                           department_filter=department_filter,
-                           date_filter=date_filter,
-                           week_filter=week_filter,
-                           status_filter=status_filter,
-                           start_of_week=start_of_week,
-                           end_of_week=end_of_week)
+    for task in overdue_tasks:
+        # التحقق من عدم وجود إشعار سابق لنفس المهمة
+        existing_notif = Notification.query.filter_by(
+            task_id=task.id,
+            employee_id=task.employee_id,
+            message=f"المهمة '{task.task_name}' متأخرة"
+        ).first()
 
+        if not existing_notif:
+            message = f"المهمة '{task.task_name}' متأخرة"
+            new_notif = Notification(
+                employee_id=task.employee_id,
+                task_id=task.id,
+                message=message
+            )
+            db.session.add(new_notif)
+
+    db.session.commit()
+
+    # 1. جلب الإشعارات المتعلقة بالمهام المتأخرة للمستخدم الحالي
+    overdue_notifications = Notification.query.filter(
+        Notification.employee_id == current_user.id,
+        Notification.message.like('%متأخرة%')
+    ).options(
+        db.joinedload(Notification.task)
+    ).all()
+    
+    # 2. جلب الإشعارات المتعلقة بالمهام التي تم وضع تاغ للمستخدم فيها من قبل موظفين آخرين
+    # استخدام استعلام مخصص للحصول على المهام التي تم وضع تاغ للمستخدم فيها من قبل موظفين آخرين
+    tag_notifications = []
+    
+    # الحصول على جميع إشعارات التاغ للمستخدم الحالي
+    all_tag_notifications = Notification.query.filter(
+        Notification.employee_id == current_user.id,
+        Notification.message.like('%تمت الإشارة إليك%')
+    ).options(
+        db.joinedload(Notification.task)
+    ).all()
+    
+    # فلترة الإشعارات للتأكد من أن التاغ تم من قبل موظف آخر وليس المستخدم نفسه
+    for notification in all_tag_notifications:
+        if notification.task and notification.task.employee_id != current_user.id:
+            tag_notifications.append(notification)
+    
+    # دمج الإشعارات وترتيبها حسب الوقت
+    notifications = overdue_notifications + tag_notifications
+    notifications.sort(key=lambda x: x.timestamp, reverse=True)
+    
+    # تحديد نوع كل إشعار (للعرض في القالب)
+    for notification in notifications:
+        if 'متأخرة' in notification.message:
+            notification.notification_type = 'overdue'
+        elif 'تمت الإشارة إليك' in notification.message:
+            notification.notification_type = 'tag'
+        else:
+            notification.notification_type = 'general'
+    
+    # اقتصار العدد على 10 إشعارات
+    notifications = notifications[:10]
+
+    # تحديد المهام المتأخرة المهمة للتحذيرات (منفصلة عن الإشعارات)
+    # فقط المهام المتأخرة المهمة (مثل المهام التي تأخرت أكثر من 3 أيام أو المهام العاجلة)
+    overdue_task_alerts = []
+    for task in overdue_tasks:
+        if task.employee_id == current_user.id and task.is_important:
+            overdue_task_alerts.append(task)
+    
+    return render_template(
+        'dashboard.html',
+        tasks=tasks,
+        all_departments=all_departments,
+        all_employees=all_employees,
+        department_filter=department_filter,
+        employee_filter=employee_filter,
+        status_filter=status_filter,
+        week_filter=week_filter,
+        notifications=notifications,
+        overdue_task_alerts=overdue_task_alerts
+    )
+
+
+@app.route('/mark_notification_read/<int:notification_id>', methods=['POST'])
+@login_required
+def mark_notification_read(notification_id):
+    notification = Notification.query.get_or_404(notification_id)
+    if notification.employee_id == current_user.id:
+        notification.is_read = True
+        db.session.commit()
+    return '', 204  # No content response
+
+
+@app.route('/notifications')
+@login_required
+def notifications():
+    # جلب جميع الإشعارات للمستخدم الحالي
+    all_notifications = Notification.query.filter_by(
+        employee_id=current_user.id
+    ).order_by(
+        Notification.timestamp.desc()
+    ).all()
+    
+    return render_template('notifications.html', notifications=all_notifications)
 
 
 @app.route('/add_task', methods=['GET', 'POST'])
 @login_required
 def add_task():
     if request.method == 'POST':
-        task_name = request.form.get('task_name', '').strip()
-        description = request.form.get('description', '').strip()  # ✅ تم إضافته
-        status = request.form.get('status', '').strip()
-        week_str = request.form.get('week', '')
-
-        try:
-            year, week = map(int, week_str.split('-W'))
-            date_val = datetime.strptime(f'{year}-{week}-1', "%Y-%W-%w").date()
-        except (ValueError, AttributeError):
-            flash('صيغة الأسبوع غير صحيحة. يرجى اختيار أسبوع صحيح.', 'danger')
+        task_name = request.form.get('task_name')
+        department_id = request.form.get('department_id')
+        employee_id = request.form.get('employee_id')
+        status = request.form.get('status')
+        date_str = request.form.get('date')
+        description = request.form.get('description')
+        
+        # الحصول على قائمة الموظفين المشار إليهم (تاغ)
+        tagged_employee_ids = request.form.getlist('tagged_employees')
+        
+        # التحقق من البيانات
+        if not task_name or not department_id or not employee_id or not status or not date_str:
+            flash('يرجى ملء جميع الحقول المطلوبة', 'danger')
             return redirect(url_for('add_task'))
-
+        
+        try:
+            task_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            flash('تنسيق التاريخ غير صحيح', 'danger')
+            return redirect(url_for('add_task'))
+        
+        # إنشاء المهمة الجديدة
         new_task = Task(
             task_name=task_name,
-            description=description,  # ✅ تم إضافته هنا
-            department_id=current_user.department_id,
+            department_id=department_id,
+            employee_id=employee_id,
             status=status,
-            date=date_val,
-            employee_id=current_user.id
+            date=task_date,
+            description=description
         )
+        
         db.session.add(new_task)
-        db.session.commit()
-        flash('تمت إضافة المهمة بنجاح', 'success')
-        return redirect(url_for('dashboard'))
-
+        db.session.flush()  # للحصول على معرف المهمة الجديدة
+        
+        # إضافة العلاقات مع الموظفين المشار إليهم (تاغ)
+        for emp_id in tagged_employee_ids:
+            if emp_id.isdigit():
+                emp_id_int = int(emp_id)
+                
+                # إنشاء علاقة تاغ
+                tag = TaskTag(
+                    task_id=new_task.id,
+                    employee_id=emp_id_int
+                )
+                db.session.add(tag)
+                
+                # إنشاء إشعار للموظف المشار إليه
+                notification = Notification(
+                    employee_id=emp_id_int,
+                    task_id=new_task.id,
+                    message=f"تمت الإشارة إليك في المهمة '{task_name}' بواسطة {current_user.name}"
+                )
+                db.session.add(notification)
+        
+        try:
+            db.session.commit()
+            flash('تمت إضافة المهمة بنجاح', 'success')
+            return redirect(url_for('dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            flash('حدث خطأ أثناء حفظ المهمة', 'danger')
+            return redirect(url_for('add_task'))
+    
+    # الحصول على قائمة الأقسام والموظفين
+    departments = Department.query.all()
+    
+    # تحديد الموظفين المتاحين بناءً على دور المستخدم
+    if is_admin():
+        employees = Employee.query.all()
+    else:
+        # المدير يمكنه إضافة مهام لنفسه أو للموظفين التابعين له
+        employees = [current_user] + Employee.query.filter_by(manager_id=current_user.id).all()
+    
+    # الحصول على قائمة الموظفين للاختيار منهم للتاغ
+    tag_employees = Employee.query.filter(Employee.id != current_user.id).all()
+    
     return render_template(
         'add_task.html',
+        departments=departments,
+        employees=employees,
+        tag_employees=tag_employees,
         employee_name=current_user.name,
         department_name=current_user.department.name,
         current_week=datetime.now().strftime("%Y-W%W")
     )
 
 
+@app.route('/edit_task/<int:task_id>', methods=['GET', 'POST'])
+@login_required
+def edit_task(task_id):
+    task = Task.query.options(
+        db.joinedload(Task.tagged_employees)
+    ).get_or_404(task_id)
+    
+    if not can_edit_task(task):
+        flash('ليس لديك صلاحية لتعديل هذه المهمة', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        task.task_name = request.form.get('task_name')
+        task.department_id = request.form.get('department_id')
+        task.employee_id = request.form.get('employee_id')
+        task.status = request.form.get('status')
+        date_str = request.form.get('date')
+        task.description = request.form.get('description')
+        
+        # الحصول على قائمة الموظفين المشار إليهم (تاغ)
+        tagged_employee_ids = request.form.getlist('tagged_employees')
+        
+        try:
+            task.date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            flash('تنسيق التاريخ غير صحيح', 'danger')
+            return redirect(url_for('edit_task', task_id=task_id))
+        
+        # حذف العلاقات القديمة مع الموظفين المشار إليهم
+        TaskTag.query.filter_by(task_id=task.id).delete()
+        
+        # إضافة العلاقات الجديدة مع الموظفين المشار إليهم
+        for emp_id in tagged_employee_ids:
+            if emp_id.isdigit():
+                emp_id_int = int(emp_id)
+                
+                # إنشاء علاقة تاغ
+                tag = TaskTag(
+                    task_id=task.id,
+                    employee_id=emp_id_int
+                )
+                db.session.add(tag)
+                
+                # التحقق من عدم وجود إشعار سابق لنفس الموظف ونفس المهمة
+                existing_notif = Notification.query.filter_by(
+                    task_id=task.id,
+                    employee_id=emp_id_int,
+                    message=f"تمت الإشارة إليك في المهمة '{task.task_name}' بواسطة {current_user.name}"
+                ).first()
+                
+                if not existing_notif:
+                    # إنشاء إشعار للموظف المشار إليه
+                    notification = Notification(
+                        employee_id=emp_id_int,
+                        task_id=task.id,
+                        message=f"تمت الإشارة إليك في المهمة '{task.task_name}' بواسطة {current_user.name}"
+                    )
+                    db.session.add(notification)
+        
+        try:
+            db.session.commit()
+            flash('تم تحديث المهمة بنجاح', 'success')
+            return redirect(url_for('dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            flash('حدث خطأ أثناء تحديث المهمة', 'danger')
+            return redirect(url_for('edit_task', task_id=task_id))
+    
+    # الحصول على قائمة الأقسام والموظفين
+    departments = Department.query.all()
+    
+    # تحديد الموظفين المتاحين بناءً على دور المستخدم
+    if is_admin():
+        employees = Employee.query.all()
+    else:
+        # المدير يمكنه تعديل مهام نفسه أو الموظفين التابعين له
+        employees = [current_user] + Employee.query.filter_by(manager_id=current_user.id).all()
+    
+    # الحصول على قائمة الموظفين للاختيار منهم للتاغ
+    tag_employees = Employee.query.filter(Employee.id != current_user.id).all()
+    
+    # الحصول على قائمة معرفات الموظفين المشار إليهم حالياً
+    current_tagged_ids = [tag.employee_id for tag in task.tagged_employees]
+    
+    return render_template(
+        'edit_task.html',
+        task=task,
+        departments=departments,
+        employees=employees,
+        tag_employees=tag_employees,
+        current_tagged_ids=current_tagged_ids
+    )
+
+
+@app.route('/get_tagged_employees/<int:task_id>')
+@login_required
+def get_tagged_employees(task_id):
+    task = Task.query.get_or_404(task_id)
+    tagged_employees = []
+    
+    for tag in task.tagged_employees:
+        employee = Employee.query.get(tag.employee_id)
+        if employee:
+            tagged_employees.append({
+                'id': employee.id,
+                'name': employee.name
+            })
+    
+    return jsonify(tagged_employees)
+
+
+@app.route('/task_details/<int:task_id>')
+@login_required
+def task_details(task_id):
+    task = Task.query.options(
+        db.joinedload(Task.employee),
+        db.joinedload(Task.department),
+        db.joinedload(Task.tagged_employees).joinedload(TaskTag.employee)
+    ).get_or_404(task_id)
+    
+    # الحصول على قائمة الموظفين المشار إليهم
+    tagged_employees = []
+    for tag in task.tagged_employees:
+        if tag.employee:
+            tagged_employees.append(tag.employee)
+    
+    return render_template('task_details.html', task=task, tagged_employees=tagged_employees)
+
 
 @app.route('/update_status/<int:task_id>', methods=['POST'])
 @login_required
 def update_status(task_id):
     task = Task.query.get_or_404(task_id)
+    
     if not can_edit_task(task):
-        flash("ليس لديك صلاحية لتعديل هذه المهمة", "danger")
+        flash('ليس لديك صلاحية لتعديل هذه المهمة', 'danger')
         return redirect(url_for('dashboard'))
-    task.status = request.form['status']
-    db.session.commit()
-    flash("تم تحديث الحالة بنجاح.", "success")
+    
+    new_status = request.form.get('status')
+    if new_status:
+        task.status = new_status
+        db.session.commit()
+        flash('تم تحديث حالة المهمة بنجاح', 'success')
+    
     return redirect(url_for('dashboard'))
 
 
 @app.route('/delete_task/<int:task_id>', methods=['POST'])
 @login_required
 def delete_task(task_id):
-    try:
-        task = Task.query.get_or_404(task_id)
-        if not (current_user.role in ['admin', 'manager'] or task.employee_id == current_user.id):
-            flash('ليس لديك صلاحية لحذف هذه المهمة', 'danger')
-            return redirect(url_for('dashboard'))
-        db.session.delete(task)
-        db.session.commit()
-        flash('تم حذف المهمة بنجاح', 'success')
-        return redirect(url_for('dashboard'))
-    except Exception as e:
-        db.session.rollback()
-        flash(f'حدث خطأ أثناء الحذف: {str(e)}', 'danger')
-        return redirect(url_for('dashboard'))
-
-
-@app.route('/task/<int:task_id>')
-@login_required
-def task_details(task_id):
     task = Task.query.get_or_404(task_id)
-    return render_template('task_details.html', task=task)
-
-
-
-@app.route('/edit_task/<int:task_id>', methods=['GET', 'POST'])
-@login_required
-def edit_task(task_id):
-    task = Task.query.get_or_404(task_id)
+    
     if not can_edit_task(task):
-        flash("ليس لديك صلاحية للتعديل", "danger")
+        flash('ليس لديك صلاحية لحذف هذه المهمة', 'danger')
         return redirect(url_for('dashboard'))
-    if request.method == 'POST':
-        task.task_name = request.form.get('task_name')
-        task.status = request.form.get('status')
-        task.description = request.form.get('description')
-        if request.form.get('date'):
-            try:
-                task.date = datetime.strptime(request.form.get('date'), '%Y-%m-%d').date()
-            except ValueError:
-                flash("تنسيق التاريخ غير صحيح", "danger")
-                return redirect(request.url)
-        db.session.commit()
-        flash("تم التعديل بنجاح", "success")
-        return redirect(url_for('task_details', task_id=task.id))
-    return render_template('edit_task.html', task=task)
-
-
-@app.route('/run_archive')
-def run_archive():
-    archive_completed_tasks()
-    flash("تم أرشفة المهام المكتملة بنجاح", "success")
+    
+    # حذف الإشعارات المرتبطة بالمهمة
+    Notification.query.filter_by(task_id=task.id).delete()
+    
+    # حذف المهمة
+    db.session.delete(task)
+    db.session.commit()
+    
+    flash('تم حذف المهمة بنجاح', 'success')
     return redirect(url_for('dashboard'))
 
 
-@app.route('/archived_tasks', methods=['GET', 'POST'])
+@app.route('/archived_tasks')
 @login_required
 def archived_tasks():
-    departments = Department.query.all() if is_admin() else None
-    employees = Employee.query.all() if is_admin() else None
-
-    selected_department = request.args.get('department')
-    selected_employee = request.args.get('employee')
-    selected_week = request.args.get('week')
-
-    query = ArchivedTask.query
+    # بناء الاستعلام الأساسي
+    query = ArchivedTask.query.options(
+        db.joinedload(ArchivedTask.employee),
+        db.joinedload(ArchivedTask.department)
+    )
+    
+    # تطبيق الفلاتر حسب دور المستخدم
     if not is_admin():
         query = query.filter_by(employee_id=current_user.id)
-
-    if selected_department:
-        query = query.filter_by(department_id=selected_department)
-    if selected_employee:
-        query = query.filter_by(employee_id=selected_employee)
-    if selected_week:
-        try:
-            year, week = map(int, selected_week.split("-W"))
-            start_date = date.fromisocalendar(year, week, 1)
-            end_date = date.fromisocalendar(year, week, 7)
-            query = query.filter(ArchivedTask.date >= start_date, ArchivedTask.date <= end_date)
-        except ValueError:
-            flash("صيغة الأسبوع غير صحيحة", "danger")
-
-    tasks = query.order_by(ArchivedTask.date.desc()).all()
-
-    return render_template('archived_tasks.html',
-                           tasks=tasks,
-                           departments=departments,
-                           employees=employees,
-                           is_admin=is_admin())
-
-
-@app.route('/teams')
-@login_required
-def teams():
-    departments = Department.query.options(
-        db.joinedload(Department.manager),
-        db.joinedload(Department.employees)
-    ).all()
-    return render_template('teams.html', departments=departments)
-
-@app.route('/org_chart')
-@login_required
-def org_chart():
-    ceo = Employee.query.filter_by(manager_id=None).first()  # المدير التنفيذي ما عنده مدير
     
-    departments = Department.query.options(db.subqueryload(Department.employees)).all()
-
-    for dept in departments:
-        # نبحث عن الموظف في القسم اللي هو مدير (يظهر كـ manager_id لكثير موظفين من نفس القسم)
-        managers_in_dept = set(emp.manager_id for emp in dept.employees if emp.manager_id)
-        # مدير القسم هو الموظف الذي رقمه موجود في مجموعة المديرين وفي نفس الوقت هو موظف في القسم نفسه
-        dept.manager = next((emp for emp in dept.employees if emp.id in managers_in_dept), None)
-
-    return render_template('org_chart.html', ceo=ceo, departments=departments)
-
-
-from flask import jsonify
-
-@app.route('/employee/<int:employee_id>/details')
-def employee_details(employee_id):
-    query = text("""
-        SELECT e.id, e.name, e.job_title, d.name AS department, e.country, e.phone, e.email, e.profile_image
-        FROM employee e
-        LEFT JOIN department d ON e.department_id = d.id
-        WHERE e.id = :id
-    """)
-
-    employee = db.session.execute(query, {"id": employee_id}).fetchone()
-
-    if not employee:
-        return jsonify({"error": "الموظف غير موجود"}), 404
-
-    data = {
-        "id": employee.id,
-        "name": employee.name,
-        "job_title": employee.job_title,
-        "department": employee.department,  # هنا اسم القسم بدل الرقم
-        "country": employee.country,
-        "phone": employee.phone,
-        "email": employee.email,
-        "profile_image": employee.profile_image or "default-profile.png"
-    }
-
-    return jsonify(data)
+    # جلب المهام المؤرشفة
+    archived = query.order_by(ArchivedTask.date.desc()).all()
+    
+    return render_template('archived_tasks.html', archived_tasks=archived)
 
 
 @app.route('/export_tasks')
 @login_required
 def export_tasks():
-    # الفلاتر القادمة من شريط العنوان
-    employee_id   = request.args.get('employee_filter')
-    department_id = request.args.get('department_filter')
-    date_filter   = request.args.get('date_filter')
+    # معالجة الفلاتر
+    date_filter = request.args.get('date_filter')
     status_filter = request.args.get('status_filter')
-
-    # نصّ الاستعلام مع JOIN على الجداول الصحيحة
-    sql = """
-        SELECT 
-            e.name              AS employee_name,
-            d.name              AS department_name,
-            t.task_name,
-            t.description,
-            t.status,
-            t.date
-        FROM task t
-        JOIN employee   e ON t.employee_id   = e.id
-        LEFT JOIN department d ON e.department_id = d.id
-        WHERE 1=1            -- سنضيف عليه الشروط ديناميكيًا
-    """
-    params = {}
-
-    # إذا كان المستخدم موظفًا عاديًا: يصدِّر فقط مهامه
-    if current_user.role == 'employee':
-        sql += " AND e.id = :cur_emp_id"
-        params['cur_emp_id'] = current_user.id
-    # أمّا لو أدمن أو HR فيمكنه اختيار موظف محدَّد إن وُجد فلتر employee_filter
-    elif employee_id:
-        sql += " AND e.id = :emp_id"
-        params['emp_id'] = employee_id
-
-    # فلتر القسم (إن وجد)
-    if department_id:
-        sql += " AND d.id = :dept_id"
-        params['dept_id'] = department_id
-
-    # فلتر التاريخ
+    employee_filter = request.args.get('employee_filter')
+    department_filter = request.args.get('department_filter')
+    week_filter = request.args.get('week')
+    
+    # بناء الاستعلام الأساسي
+    query = Task.query.options(
+        db.joinedload(Task.employee),
+        db.joinedload(Task.department)
+    )
+    
+    # تطبيق الفلاتر
+    if is_admin():
+        if employee_filter and employee_filter.isdigit():
+            query = query.filter(Task.employee_id == int(employee_filter))
+    else:
+        query = query.filter_by(employee_id=current_user.id)
+    
+    if department_filter and department_filter.isdigit():
+        query = query.filter(Task.department_id == int(department_filter))
+    
     if date_filter:
-        sql += " AND t.date = :date_f"
-        params['date_f'] = date_filter
-
-    # فلتر الحالة
+        try:
+            parsed_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
+            query = query.filter(Task.date == parsed_date)
+        except ValueError:
+            pass
+    
+    # فلترة حسب الأسبوع
+    if week_filter:
+        match = re.match(r"(\d{4})-W(\d{2})", week_filter)
+        if match:
+            year, week = int(match.group(1)), int(match.group(2))
+            try:
+                monday = datetime.strptime(f"{year}-W{week}-1", "%G-W%V-%u").date()
+                start_of_week = monday - timedelta(days=2)  # السبت بدلاً من الإثنين
+                end_of_week = start_of_week + timedelta(days=6)
+                query = query.filter(Task.date.between(start_of_week, end_of_week))
+            except ValueError:
+                pass
+    
     if status_filter:
-        sql += " AND t.status = :status_f"
-        params['status_f'] = status_filter
-
-    # تنفيذ الاستعلام
-    rows = db.session.execute(text(sql), params).fetchall()
-
-    # إعداد البيانات لـ Excel
-    data = [{
-        'اسم الموظف':   r.employee_name,
-        'القسم':        r.department_name,
-        'اسم المهمة':   r.task_name,
-        'الوصف':        r.description,
-        'الحالة':       r.status,
-        'التاريخ':      r.date.strftime('%Y-%m-%d') if r.date else ''
-    } for r in rows]
-
+        query = query.filter(Task.status == status_filter)
+    
+    # جلب المهام المصفاة
+    tasks = query.order_by(Task.date.desc()).all()
+    
+    # إنشاء DataFrame
+    data = []
+    for task in tasks:
+        data.append({
+            'اسم المهمة': task.task_name,
+            'القسم': task.department.name,
+            'الموظف': task.employee.name,
+            'الحالة': task.status,
+            'التاريخ': task.date.strftime('%Y-%m-%d'),
+            'الوصف': task.description or ''
+        })
+    
     df = pd.DataFrame(data)
-
-    # إنشاء ملف إكسل في الذاكرة
+    
+    # إنشاء ملف Excel في الذاكرة
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False, sheet_name='المهام')
-
+        worksheet = writer.sheets['المهام']
+        for i, col in enumerate(df.columns):
+            # تعديل عرض الأعمدة ليناسب المحتوى
+            max_len = max(df[col].astype(str).map(len).max(), len(col)) + 2
+            worksheet.set_column(i, i, max_len)
+    
     output.seek(0)
+    
+    # إرسال الملف للتنزيل
     return send_file(
         output,
         as_attachment=True,
-        download_name='tasks.xlsx',
+        download_name=f"tasks_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
 
-@app.route('/get_employees_by_department/<int:department_id>')
+
+@app.route('/org_chart')
 @login_required
-def get_employees_by_department(department_id):
-    employees = Employee.query.filter_by(department_id=department_id).all()
-    return jsonify([
-        {'id': emp.id, 'name': emp.name}
-        for emp in employees
-    ])
+def org_chart():
+    # جلب المدير التنفيذي (الموظف بدون مدير)
+    ceo = Employee.query.filter_by(manager_id=None).first()
     
+    # جلب جميع الأقسام مع موظفيها مع استثناء المدير التنفيذي
+    departments = Department.query.options(
+        db.joinedload(Department.employees)
+    ).all()
     
+    for dept in departments:
+        # استبعاد المدير التنفيذي من موظفي القسم
+        dept.employees = [emp for emp in dept.employees if emp.id != getattr(ceo, 'id', None)]
+        
+        # تحديد مدير القسم
+        dept.manager = next((emp for emp in dept.employees if getattr(emp, 'is_manager', False)), None)
+        
+        if not dept.manager and dept.employees:
+            dept.manager = dept.employees[0]
+        
+        # الموظفون العاديون (غير المدير)
+        dept.other_employees = [emp for emp in dept.employees if emp.id != getattr(dept.manager, 'id', None)]
     
-# ------------------------------
-# إنشاء الجداول
-# ------------------------------
-with app.app_context():
-    db.create_all()
+    return render_template('org_chart.html', 
+                         ceo=ceo,
+                         departments=departments)
 
 
-try:
-    with app.app_context():
-        db.create_all()
-        # اختبار الاتصال بقاعدة البيانات
-        db.session.execute(text('SELECT 1'))
-        print("✅ تم الاتصال بنجاح مع قاعدة البيانات")
-except Exception as e:
-    print(f"❌ فشل الاتصال: {e}")
-    raise
+@app.route('/employee/<int:employee_id>/details')
+@login_required
+def employee_details(employee_id):
+    employee = Employee.query.get_or_404(employee_id)
+    return jsonify({
+        'name': employee.name,
+        'job_title': employee.job_title,
+        'profile_image': employee.profile_image,
+        'department': employee.department.name if employee.department else None,
+        'email': employee.email,
+        'phone': employee.phone
+    })
+
+
+
+
+
+
+def cycle(values):
+    iterator = itertools.cycle(values)
+    return lambda: next(iterator)
+
+@app.context_processor
+def utility_processor():
+    return dict(cycle=cycle(['#f8d7da', '#d1ecf1', '#d4edda', '#fff3cd', '#e2e3e5', '#cce5ff']))
+
 
 if __name__ == '__main__':
     app.run(debug=True)
