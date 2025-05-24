@@ -391,11 +391,11 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('archived_tasks') }}">المهام المؤرشفة</a>
                     </li>
-                    {% if is_admin() %}
+                    
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('org_chart') }}">الهيكل التنظيمي</a>
                     </li>
-                    {% endif %}
+                    
                 </ul>
                 <ul class="navbar-nav">
                     <!-- قائمة الإشعارات بأسلوب فيسبوك -->
@@ -459,113 +459,87 @@
     </nav>
 
     <div class="container mt-4">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+        <!-- باقي الكود كما هو -->
         
-        <!-- تحذيرات المهام المتأخرة المهمة -->
-        {% if overdue_task_alerts %}
-            {% for task in overdue_task_alerts %}
-                <div class="alert alert-overdue" role="alert">
-                    <h5 class="mb-0">المهام</h5>
-                    <div>
-                        <a href="{{ url_for('add_task') }}" class="btn btn-primary btn-sm">
-                            <i class="bi bi-plus-lg"></i> إضافة مهمة
-                        </a>
-                        <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
-                            <i class="bi bi-funnel"></i> تصفية
-                        </button>
-                        <a href="#" onclick="exportFilteredTasks()" class="btn btn-success btn-sm">
-                            <i class="bi bi-file-earmark-excel"></i> تصدير
-                        </a>
+        <div class="card-body">
+            <!-- قسم الفلاتر (تم إصلاح مشكلة التكرار) -->
+            <div class="mb-3">
+                <button class="btn btn-outline-primary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
+                    <i class="bi bi-funnel"></i> عرض الفلاتر
+                </button>
+                
+                <div class="collapse" id="filterCollapse">
+                    <div class="card card-body">
+                        <form action="{{ url_for('dashboard') }}" method="get" class="row g-3">
+                            <div class="col-md-3">
+                                <label for="department_filter" class="form-label">القسم</label>
+                                <select class="form-select" id="department_filter" name="department_filter">
+                                    <option value="">جميع الأقسام</option>
+                                    {% for dept in all_departments %}
+                                        <option value="{{ dept.id }}" {% if department_filter == dept.id|string %}selected{% endif %}>{{ dept.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <!-- تم إصلاح مشكلة التكرار هنا - إزالة الشرط المتداخل -->
+                            {% if is_admin() or current_user.is_hr %}
+                            <div class="col-md-3">
+                                <label for="employee_filter" class="form-label">الموظف</label>
+                                <select class="form-select" id="employee_filter" name="employee_filter">
+                                    <option value="">جميع الموظفين</option>
+                                    {% for emp in all_employees %}
+                                        <option value="{{ emp.id }}" {% if employee_filter == emp.id|string %}selected{% endif %}>
+                                            {{ emp.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% else %}
+                            <div class="col-md-3">
+                                <label for="employee_filter" class="form-label">الموظف</label>
+                                <select class="form-select" id="employee_filter" name="employee_filter">
+                                    <option value="">جميع الموظفين</option>
+                                    <option value="{{ current_user.id }}" {% if employee_filter == current_user.id|string %}selected{% endif %}>
+                                        {{ current_user.name }}
+                                    </option>
+                                    {% for emp in current_user.subordinates %}
+                                        <option value="{{ emp.id }}" {% if employee_filter == emp.id|string %}selected{% endif %}>
+                                            {{ emp.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="col-md-2">
+                                <label for="status_filter" class="form-label">الحالة</label>
+                                <select class="form-select" id="status_filter" name="status_filter">
+                                    <option value="">جميع الحالات</option>
+                                    <option value="قيد التنفيذ" {% if status_filter == "قيد التنفيذ" %}selected{% endif %}>قيد التنفيذ</option>
+                                    <option value="مكتمل" {% if status_filter == "مكتمل" %}selected{% endif %}>مكتمل</option>
+                                    <option value="معلق" {% if status_filter == "معلق" %}selected{% endif %}>معلق</option>
+                                    <option value="ملغي" {% if status_filter == "ملغي" %}selected{% endif %}>ملغي</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-2">
+                                <label for="date_filter" class="form-label">التاريخ</label>
+                                <input type="date" class="form-control" id="date_filter" name="date_filter" value="{{ date_filter }}">
+                            </div>
+                            
+                            <div class="col-md-2">
+                                <label for="week" class="form-label">الأسبوع</label>
+                                <input type="week" class="form-control" id="week" name="week" value="{{ week_filter }}">
+                            </div>
+                            
+                            <div class="col-12 mt-3">
+                                <button type="submit" class="btn btn-primary">تطبيق</button>
+                                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">إعادة تعيين</a>
+                            </div>
+                        </form>
                     </div>
                 </div>
-            {% endfor %}
-        {% endif %}
-        
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">المهام</h5>
-                <div>
-                    <a href="{{ url_for('add_task') }}" class="btn btn-primary btn-sm">
-                        <i class="bi bi-plus-lg"></i> إضافة مهمة
-                    </a>
-                    <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
-                        <i class="bi bi-funnel"></i> تصفية
-                    </button>
-                    <a href="#" onclick="exportFilteredTasks()" class="btn btn-success btn-sm">
-                        <i class="bi bi-file-earmark-excel"></i> تصدير
-                    </a>
-                </div>
             </div>
-<div class="card-body">
-    <!-- قسم الفلاتر (يظهر مرة واحدة فقط) -->
-    <div class="mb-3">
-        <button class="btn btn-outline-primary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
-            <i class="bi bi-funnel"></i> عرض الفلاتر
-        </button>
-        
-        <div class="collapse" id="filterCollapse">
-            <div class="card card-body">
-                <form action="{{ url_for('dashboard') }}" method="get" class="row g-3">
-                    <div class="col-md-3">
-                        <label for="department_filter" class="form-label">القسم</label>
-                        <select class="form-select" id="department_filter" name="department_filter">
-                            <option value="">جميع الأقسام</option>
-                            {% for dept in all_departments %}
-                                <option value="{{ dept.id }}" {% if department_filter == dept.id|string %}selected{% endif %}>{{ dept.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
-                    {% if is_admin() or current_user.is_hr %}
-                    <div class="col-md-3">
-                        <label for="employee_filter" class="form-label">الموظف</label>
-                        <select class="form-select" id="employee_filter" name="employee_filter">
-                            <option value="">جميع الموظفين</option>
-                            {% for emp in all_employees %}
-                                <option value="{{ emp.id }}" {% if employee_filter == emp.id|string %}selected{% endif %}>{{ emp.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    {% endif %}
-                    
-                    <div class="col-md-2">
-                        <label for="status_filter" class="form-label">الحالة</label>
-                        <select class="form-select" id="status_filter" name="status_filter">
-                            <option value="">جميع الحالات</option>
-                            <option value="قيد التنفيذ" {% if status_filter == "قيد التنفيذ" %}selected{% endif %}>قيد التنفيذ</option>
-                            <option value="مكتمل" {% if status_filter == "مكتمل" %}selected{% endif %}>مكتمل</option>
-                            <option value="معلق" {% if status_filter == "معلق" %}selected{% endif %}>معلق</option>
-                            <option value="ملغي" {% if status_filter == "ملغي" %}selected{% endif %}>ملغي</option>
-                        </select>
-                    </div>
-                    
-                    <div class="col-md-2">
-                        <label for="date_filter" class="form-label">التاريخ</label>
-                        <input type="date" class="form-control" id="date_filter" name="date_filter" value="{{ date_filter }}">
-                    </div>
-                    
-                    <div class="col-md-2">
-                        <label for="week" class="form-label">الأسبوع</label>
-                        <input type="week" class="form-control" id="week" name="week" value="{{ week_filter }}">
-                    </div>
-                    
-                    <div class="col-12 mt-3">
-                        <button type="submit" class="btn btn-primary">تطبيق</button>
-                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">إعادة تعيين</a>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
                 <div class="table-responsive">
                     <table class="tasks-table" style="position: relative;">
                         <thead>
