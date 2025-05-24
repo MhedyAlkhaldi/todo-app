@@ -335,42 +335,50 @@
 
     <!-- الأقسام -->
     <div class="org-container">
-        {% for dept in departments %}
-<div class="dept-card" style="background-color: {{ cycle() }};">
+{% for dept in departments %}
+{% if colors and colors|length > 0 %}
+  {% set color_index = loop.index0 % colors|length %}
+  <div class="dept-card" style="background-color: {{ colors[color_index] }};">
+{% else %}
+  <div class="dept-card" style="background-color: #ffffff;">
+{% endif %}
+    <div class="dept-title">{{ dept.name }}</div>
 
-            <!-- مدير القسم -->
-            {% if dept.manager %}
-            <div class="employee-card bg-white p-3" onclick="showEmployeeModal({{ dept.manager.id }})">
-                <img src="{{ url_for('static', filename='uploads/' + (dept.manager.profile_image if dept.manager.profile_image else 'default-profile.png')) }}" 
-                     class="profile-img mb-2" 
-                     alt="{{ dept.manager.name }}"
-                     onerror="this.onerror=null;this.src='/static/uploads/default-profile.png'">
-                <h5>{{ dept.manager.name }}</h5>
-                <p class="text-muted small">{{ dept.manager.job_title or 'مدير قسم' }}</p>
-            </div>
-            {% endif %}
-
-            <!-- باقي موظفي القسم -->
-            <div class="employees-container mt-3">
-                {% for emp in dept.other_employees %}
-                <div class="employee-card bg-white p-2" onclick="showEmployeeModal({{ emp.id }})">
-                    <img src="{{ url_for('static', filename='uploads/' + (emp.profile_image if emp.profile_image else 'default-profile.png')) }}" 
-                         class="profile-img-sm mb-1" 
-                         alt="{{ emp.name }}"
-                         onerror="this.onerror=null;this.src='/static/uploads/default-profile.png'">
-                    <h6 class="mb-0">{{ emp.name }}</h6>
-                    <p class="text-muted small">{{ emp.job_title or 'موظف' }}</p>
-                </div>
-                {% else %}
-                <div class="text-center text-muted fst-italic">
-                    لا يوجد موظفين آخرين في هذا القسم
-                </div>
-                {% endfor %}
-            </div>
+    <!-- مدير القسم -->
+    {% if dept.manager %}
+    <div class="manager-card">
+        <div class="employee-card bg-white p-3" onclick="showEmployeeModal({{ dept.manager.id }})">
+            <img src="{{ url_for('static', filename='uploads/' + (dept.manager.profile_image or 'default-profile.png')) }}" 
+                 class="profile-img mb-2" 
+                 onerror="this.src='/static/uploads/default-profile.png'">
+            <h5>{{ dept.manager.name }}</h5>
+            <p class="text-muted small">
+                {{ dept.manager.job_title or 'مدير قسم' }}
+                {% if dept.manager.is_ceo %} (CEO) {% endif %}
+            </p>
         </div>
-        {% endfor %}
     </div>
+    {% endif %}
+
+    <!-- باقي الموظفين -->
+<div class="employees-container mt-3">
+    {% for emp in dept.employees if not emp.is_manager and emp.id != dept.manager.id %}
+    <div class="employee-card bg-white p-2" onclick="showEmployeeModal({{ emp.id }})">
+        <img src="{{ url_for('static', filename='uploads/' + (emp.profile_image or 'default-profile.png')) }}" 
+             class="profile-img-sm mb-1" 
+             alt="{{ emp.name }}"
+             onerror="this.src='/static/uploads/default-profile.png'">
+        <h6 class="mb-0">{{ emp.name }}</h6>
+        <p class="text-muted small">{{ emp.job_title or 'موظف' }}</p>
+    </div>
+    {% else %}
+    <div class="text-center text-muted fst-italic">
+        لا يوجد موظفين آخرين في هذا القسم
+    </div>
+    {% endfor %}
 </div>
+</div>
+{% endfor %}
 
 <!-- نافذة التفاصيل -->
 <div class="modal fade" id="employeeModal" tabindex="-1" aria-hidden="true">

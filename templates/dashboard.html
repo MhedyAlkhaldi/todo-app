@@ -505,56 +505,67 @@
                     </a>
                 </div>
             </div>
-            <div class="card-body">
-                <div class="collapse mb-3" id="filterCollapse">
-                    <div class="card card-body">
-                        <form action="{{ url_for('dashboard') }}" method="get" class="row g-3">
-                            <div class="col-md-3">
-                                <label for="department_filter" class="form-label">القسم</label>
-                                <select class="form-select" id="department_filter" name="department_filter">
-                                    <option value="">جميع الأقسام</option>
-                                    {% for dept in all_departments %}
-                                        <option value="{{ dept.id }}" {% if department_filter == dept.id|string %}selected{% endif %}>{{ dept.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            {% if is_admin() %}
-                            <div class="col-md-3">
-                                <label for="employee_filter" class="form-label">الموظف</label>
-                                <select class="form-select" id="employee_filter" name="employee_filter">
-                                    <option value="">جميع الموظفين</option>
-                                    {% for emp in all_employees %}
-                                        <option value="{{ emp.id }}" {% if employee_filter == emp.id|string %}selected{% endif %}>{{ emp.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            {% endif %}
-                            <div class="col-md-2">
-                                <label for="status_filter" class="form-label">الحالة</label>
-                                <select class="form-select" id="status_filter" name="status_filter">
-                                    <option value="">جميع الحالات</option>
-                                    <option value="قيد التنفيذ" {% if status_filter == "قيد التنفيذ" %}selected{% endif %}>قيد التنفيذ</option>
-                                    <option value="مكتمل" {% if status_filter == "مكتمل" %}selected{% endif %}>مكتمل</option>
-                                    <option value="معلق" {% if status_filter == "معلق" %}selected{% endif %}>معلق</option>
-                                    <option value="ملغي" {% if status_filter == "ملغي" %}selected{% endif %}>ملغي</option>
-                                </select>
-                            </div>
-                            <div class="col-md-2">
-                                <label for="date_filter" class="form-label">التاريخ</label>
-                                <input type="date" class="form-control" id="date_filter" name="date_filter" value="{{ date_filter }}">
-                            </div>
-                            <div class="col-md-2">
-                                <label for="week" class="form-label">الأسبوع</label>
-                                <input type="week" class="form-control" id="week" name="week" value="{{ week_filter }}">
-                            </div>
-                            <div class="col-12 mt-3">
-                                <button type="submit" class="btn btn-primary">تطبيق</button>
-                                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">إعادة تعيين</a>
-                            </div>
-                        </form>
+<div class="card-body">
+    <!-- قسم الفلاتر (يظهر مرة واحدة فقط) -->
+    <div class="mb-3">
+        <button class="btn btn-outline-primary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
+            <i class="bi bi-funnel"></i> عرض الفلاتر
+        </button>
+        
+        <div class="collapse" id="filterCollapse">
+            <div class="card card-body">
+                <form action="{{ url_for('dashboard') }}" method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="department_filter" class="form-label">القسم</label>
+                        <select class="form-select" id="department_filter" name="department_filter">
+                            <option value="">جميع الأقسام</option>
+                            {% for dept in all_departments %}
+                                <option value="{{ dept.id }}" {% if department_filter == dept.id|string %}selected{% endif %}>{{ dept.name }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
-                </div>
-                
+                    
+                    {% if is_admin() or current_user.is_hr %}
+                    <div class="col-md-3">
+                        <label for="employee_filter" class="form-label">الموظف</label>
+                        <select class="form-select" id="employee_filter" name="employee_filter">
+                            <option value="">جميع الموظفين</option>
+                            {% for emp in all_employees %}
+                                <option value="{{ emp.id }}" {% if employee_filter == emp.id|string %}selected{% endif %}>{{ emp.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="col-md-2">
+                        <label for="status_filter" class="form-label">الحالة</label>
+                        <select class="form-select" id="status_filter" name="status_filter">
+                            <option value="">جميع الحالات</option>
+                            <option value="قيد التنفيذ" {% if status_filter == "قيد التنفيذ" %}selected{% endif %}>قيد التنفيذ</option>
+                            <option value="مكتمل" {% if status_filter == "مكتمل" %}selected{% endif %}>مكتمل</option>
+                            <option value="معلق" {% if status_filter == "معلق" %}selected{% endif %}>معلق</option>
+                            <option value="ملغي" {% if status_filter == "ملغي" %}selected{% endif %}>ملغي</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-2">
+                        <label for="date_filter" class="form-label">التاريخ</label>
+                        <input type="date" class="form-control" id="date_filter" name="date_filter" value="{{ date_filter }}">
+                    </div>
+                    
+                    <div class="col-md-2">
+                        <label for="week" class="form-label">الأسبوع</label>
+                        <input type="week" class="form-control" id="week" name="week" value="{{ week_filter }}">
+                    </div>
+                    
+                    <div class="col-12 mt-3">
+                        <button type="submit" class="btn btn-primary">تطبيق</button>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">إعادة تعيين</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
                 <div class="table-responsive">
                     <table class="tasks-table" style="position: relative;">
                         <thead>

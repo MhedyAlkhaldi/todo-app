@@ -94,6 +94,10 @@ class Employee(UserMixin, db.Model):
     
     # العلاقة مع المهام التي تم وضع تاغ للموظف فيها
     tagged_tasks = db.relationship('TaskTag', back_populates='employee')
+    
+    is_manager = db.Column(db.Boolean, default=False)  # إضافة هذا الحقل
+    is_ceo = db.Column(db.Boolean, default=False)     # إضافة هذا الحقل
+    is_hr = db.Column(db.Boolean, default=False)  # إضافة هذا الحقل
 
 
 # جدول العلاقة بين المهام والموظفين المشار إليهم (تاغ)
@@ -193,6 +197,8 @@ def is_admin():
 
 
 def can_edit_task(task):
+    if current_user.is_hr:
+        return False  # HR لا يمكنه التعديل
     return is_admin() or task.employee_id == current_user.id
 
 
@@ -319,25 +325,30 @@ def logout():
 def dashboard():
     # جلب البيانات الأساسية
     all_departments = Department.query.all()
-    all_employees = Employee.query.options(db.joinedload(Employee.department)).all() if is_admin() else []
+    all_employees = Employee.query.options(db.joinedload(Employee.department)).all() if (is_admin() or current_user.is_hr) else []
 
-    # معالجة الفلاتر
-    date_filter = request.args.get('date_filter')
-    status_filter = request.args.get('status_filter')
-    employee_filter = request.args.get('employee_filter')
-    department_filter = request.args.get('department_filter')
-    week_filter = request.args.get('week')
+    # معالجة الفلاتر من الطلب
+    filters = {
+        'date': request.args.get('date_filter'),
+        'status': request.args.get('status_filter'),
+        'employee': request.args.get('employee_filter'),
+        'department': request.args.get('department_filter'),
+        'week': request.args.get('week')
+    }
 
-    # بناء الاستعلام الأساسي
+    # بناء الاستعلام الأساسي مع العلاقات
     query = Task.query.options(
         db.joinedload(Task.employee),
         db.joinedload(Task.department)
     )
 
-    # تطبيق الفلاتر
-    if is_admin():
-        if employee_filter and employee_filter.isdigit():
-            query = query.filter(Task.employee_id == int(employee_filter))
+    # تطبيق فلتر الصلاحيات (مرة واحدة فقط)
+    if current_user.is_hr:
+        # HR يرى جميع المهام بدون فلتر أساسي
+        pass
+    elif is_admin():
+        if filters['employee'] and filters['employee'].isdigit():
+            query = query.filter(Task.employee_id == int(filters['employee']))
     else:
         managed_ids = [emp.id for emp in Employee.query.filter_by(manager_id=current_user.id).all()]
         query = query.filter(db.or_(
@@ -345,121 +356,89 @@ def dashboard():
             Task.employee_id == current_user.id
         ))
 
-    if department_filter and department_filter.isdigit():
-        query = query.filter(Task.department_id == int(department_filter))
+    # تطبيق الفلاتر المشتركة
+    if filters['department'] and filters['department'].isdigit():
+        query = query.filter(Task.department_id == int(filters['department']))
 
-    if date_filter:
+    if filters['date']:
         try:
-            parsed_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
+            parsed_date = datetime.strptime(filters['date'], "%Y-%m-%d").date()
             query = query.filter(Task.date == parsed_date)
         except ValueError:
             pass
 
-    # فلترة حسب الأسبوع
-    start_of_week = end_of_week = None
-    if week_filter:
-        match = re.match(r"(\d{4})-W(\d{2})", week_filter)
-        if match:
-            year, week = int(match.group(1)), int(match.group(2))
+    if filters['week']:
+        week_match = re.match(r"(\d{4})-W(\d{2})", filters['week'])
+        if week_match:
+            year, week = int(week_match.group(1)), int(week_match.group(2))
             try:
                 monday = datetime.strptime(f"{year}-W{week}-1", "%G-W%V-%u").date()
-                start_of_week = monday - timedelta(days=2)  # السبت بدلاً من الإثنين
-                end_of_week = start_of_week + timedelta(days=6)
-                query = query.filter(Task.date.between(start_of_week, end_of_week))
+                start = monday - timedelta(days=2)
+                end = start + timedelta(days=6)
+                query = query.filter(Task.date.between(start, end))
             except ValueError:
                 pass
 
-    if status_filter:
-        query = query.filter(Task.status == status_filter)
+    if filters['status']:
+        query = query.filter(Task.status == filters['status'])
 
-    # جلب المهام المصفاة
+    # جلب النتائج النهائية
     tasks = query.order_by(Task.date.desc()).all()
 
-    # معالجة المهام المتأخرة وإنشاء الإشعارات
+    # معالجة المهام المتأخرة
     today = date.today()
     overdue_tasks = Task.query.filter(
         Task.status != 'مكتمل',
         Task.date < today
-    ).options(
-        db.joinedload(Task.employee)
-    ).all()
+    ).options(db.joinedload(Task.employee)).all()
 
+    # إنشاء إشعارات المهام المتأخرة
     for task in overdue_tasks:
-        # التحقق من عدم وجود إشعار سابق لنفس المهمة
-        existing_notif = Notification.query.filter_by(
+        if not Notification.query.filter_by(
             task_id=task.id,
             employee_id=task.employee_id,
             message=f"المهمة '{task.task_name}' متأخرة"
-        ).first()
-
-        if not existing_notif:
-            message = f"المهمة '{task.task_name}' متأخرة"
-            new_notif = Notification(
+        ).first():
+            db.session.add(Notification(
                 employee_id=task.employee_id,
                 task_id=task.id,
-                message=message
-            )
-            db.session.add(new_notif)
-
+                message=f"المهمة '{task.task_name}' متأخرة"
+            ))
     db.session.commit()
 
-    # 1. جلب الإشعارات المتعلقة بالمهام المتأخرة للمستخدم الحالي
-    overdue_notifications = Notification.query.filter(
+    # تجهيز الإشعارات للعرض
+    notifications = Notification.query.filter(
         Notification.employee_id == current_user.id,
-        Notification.message.like('%متأخرة%')
-    ).options(
-        db.joinedload(Notification.task)
-    ).all()
-    
-    # 2. جلب الإشعارات المتعلقة بالمهام التي تم وضع تاغ للمستخدم فيها من قبل موظفين آخرين
-    # استخدام استعلام مخصص للحصول على المهام التي تم وضع تاغ للمستخدم فيها من قبل موظفين آخرين
-    tag_notifications = []
-    
-    # الحصول على جميع إشعارات التاغ للمستخدم الحالي
-    all_tag_notifications = Notification.query.filter(
-        Notification.employee_id == current_user.id,
-        Notification.message.like('%تمت الإشارة إليك%')
-    ).options(
-        db.joinedload(Notification.task)
-    ).all()
-    
-    # فلترة الإشعارات للتأكد من أن التاغ تم من قبل موظف آخر وليس المستخدم نفسه
-    for notification in all_tag_notifications:
-        if notification.task and notification.task.employee_id != current_user.id:
-            tag_notifications.append(notification)
-    
-    # دمج الإشعارات وترتيبها حسب الوقت
-    notifications = overdue_notifications + tag_notifications
-    notifications.sort(key=lambda x: x.timestamp, reverse=True)
-    
-    # تحديد نوع كل إشعار (للعرض في القالب)
-    for notification in notifications:
-        if 'متأخرة' in notification.message:
-            notification.notification_type = 'overdue'
-        elif 'تمت الإشارة إليك' in notification.message:
-            notification.notification_type = 'tag'
-        else:
-            notification.notification_type = 'general'
-    
-    # اقتصار العدد على 10 إشعارات
-    notifications = notifications[:10]
+        db.or_(
+            Notification.message.like('%متأخرة%'),
+            Notification.message.like('%تمت الإشارة إليك%')
+        )
+    ).options(db.joinedload(Notification.task)).all()
 
-    # تحديد المهام المتأخرة المهمة للتحذيرات (منفصلة عن الإشعارات)
-    # فقط المهام المتأخرة المهمة (مثل المهام التي تأخرت أكثر من 3 أيام أو المهام العاجلة)
-    overdue_task_alerts = []
-    for task in overdue_tasks:
-        if task.employee_id == current_user.id and task.is_important:
-            overdue_task_alerts.append(task)
-    
+    notifications = sorted([
+        {
+            **n.__dict__,
+            'notification_type': 'overdue' if 'متأخرة' in n.message else 'tag'
+        }
+        for n in notifications
+        if not n.task or n.task.employee_id != current_user.id
+    ], key=lambda x: x['timestamp'], reverse=True)[:10]
+
+    # تجهيز تحذيرات المهام المتأخرة المهمة
+    overdue_task_alerts = [
+        task for task in overdue_tasks
+        if task.is_important and (current_user.is_hr or task.employee_id == current_user.id)
+    ]
+
     return render_template(
         'dashboard.html',
         tasks=tasks,
         all_departments=all_departments,
         all_employees=all_employees,
-        department_filter=department_filter,
-        employee_filter=employee_filter,
-        status_filter=status_filter,
-        week_filter=week_filter,
+        department_filter=filters['department'],
+        employee_filter=filters['employee'],
+        status_filter=filters['status'],
+        week_filter=filters['week'],
         notifications=notifications,
         overdue_task_alerts=overdue_task_alerts
     )
@@ -857,28 +836,29 @@ def export_tasks():
 @app.route('/org_chart')
 @login_required
 def org_chart():
-    # جلب المدير التنفيذي (الموظف بدون مدير)
-    ceo = Employee.query.filter_by(manager_id=None).first()
+    # جلب المدير التنفيذي
+    ceo = Employee.query.filter_by(is_ceo=True).first()
     
-    # جلب جميع الأقسام مع موظفيها مع استثناء المدير التنفيذي
+    # جلب الأقسام مع موظفيها
     departments = Department.query.options(
         db.joinedload(Department.employees)
     ).all()
     
     for dept in departments:
-        # استبعاد المدير التنفيذي من موظفي القسم
-        dept.employees = [emp for emp in dept.employees if emp.id != getattr(ceo, 'id', None)]
+        # تحديد مدير القسم (الموظف مع is_manager=True)
+        dept.manager = next((emp for emp in dept.employees if emp.is_manager), None)
         
-        # تحديد مدير القسم
-        dept.manager = next((emp for emp in dept.employees if getattr(emp, 'is_manager', False)), None)
-        
+        # إذا لم يكن هناك مدير، نستخدم أول موظف
         if not dept.manager and dept.employees:
             dept.manager = dept.employees[0]
         
         # الموظفون العاديون (غير المدير)
-        dept.other_employees = [emp for emp in dept.employees if emp.id != getattr(dept.manager, 'id', None)]
+        dept.other_employees = [
+            emp for emp in dept.employees 
+            if emp.id != getattr(dept.manager, 'id', None)
+        ]
     
-    return render_template('org_chart.html', 
+    return render_template('org_chart.html',
                          ceo=ceo,
                          departments=departments)
 
@@ -886,20 +866,38 @@ def org_chart():
 @app.route('/employee/<int:employee_id>/details')
 @login_required
 def employee_details(employee_id):
-    employee = Employee.query.get_or_404(employee_id)
+    employee = Employee.query.options(
+        db.joinedload(Employee.department)
+    ).get_or_404(employee_id)
+    
     return jsonify({
         'name': employee.name,
         'job_title': employee.job_title,
         'profile_image': employee.profile_image,
         'department': employee.department.name if employee.department else None,
         'email': employee.email,
-        'phone': employee.phone
+        'phone': employee.phone,
+        'is_manager': employee.is_manager,
+        'is_ceo': employee.is_ceo
     })
 
 
 
+def get_tasks_for_user(user):
+    if user.is_hr:
+        return Task.query.all()  # HR يرى كل المهام
+    elif user.role == 'admin':
+        return Task.query.all()
+    elif user.role == 'manager':
+        return Task.query.filter(Task.employee_id.in_([sub.id for sub in user.subordinates])).all()
+    else:
+        return Task.query.filter_by(employee_id=user.id).all()
 
 
+
+
+def is_hr(user):
+    return hasattr(user, 'is_hr') and user.is_hr
 
 def cycle(values):
     iterator = itertools.cycle(values)
