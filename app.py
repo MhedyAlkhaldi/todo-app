@@ -568,6 +568,8 @@ def add_task():
     # الحصول على قائمة الموظفين للاختيار منهم للتاغ
     tag_employees = Employee.query.filter(Employee.id != current_user.id).all()
     
+    
+    
     return render_template(
         'add_task.html',
         departments=departments,
