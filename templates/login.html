@@ -1,68 +1,403 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تسجيل الدخول</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة المهام - تسجيل الدخول</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        :root {
+            --primary-color: #4e73df;
+            --dark-color: #2c3e50;
+            --light-color: #f8f9fc;
+        }
+        
         body {
-            direction: rtl;
-            background-color: #f4f7fc;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Tajawal', sans-serif;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--dark-color) 100%);
+            height: 100vh;
         }
-        .login-form {
-            max-width: 400px;
-            margin: 100px auto;
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+        
+        #particles-js {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
         }
-        h2 {
+        
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .login-card {
+            width: 90%;
+            max-width: 450px;
+            background: rgba(255, 255, 255, 0.97);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+            animation: fadeIn 0.5s ease-in-out;
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            padding: 0;
+            margin: 20px;
+        }
+        
+        .login-header {
+            background: var(--primary-color);
+            color: white;
+            padding: 25px;
             text-align: center;
-            margin-bottom: 25px;
+        }
+        
+        .login-header h2 {
+            margin: 0;
+            font-weight: 700;
+            font-size: 1.8rem;
+        }
+        
+        .login-body {
+            padding: 30px;
+        }
+        
+        .form-control {
+            border-radius: 8px;
+            padding: 14px 18px;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            font-size: 1rem;
+        }
+        
+        .btn-login {
+            background: var(--primary-color);
+            border: none;
+            padding: 14px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            width: 100%;
+            border-radius: 8px;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+        
+        .btn-login:hover {
+            background: #3a5bc7;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .login-footer {
+            text-align: center;
+            padding: 20px;
+            background: var(--light-color);
+            border-top: 1px solid #eee;
+            font-size: 0.9rem;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .input-group-text {
+            background-color: #f8f9fa;
+            border-right: none;
+            padding: 0 15px;
+            font-size: 1.1rem;
+        }
+        
+        .form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.25rem rgba(78, 115, 223, 0.25);
+        }
+        
+        .alert {
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+        }
+        
+        .forgot-password {
+            display: block;
+            margin-top: 20px;
+            text-align: center;
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+        
+        .toggle-password {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0 15px;
+            color: #6c757d;
+        }
+        
+        .toggle-password:focus {
+            outline: none;
+            box-shadow: none;
+        }
+        
+        .password-container {
+            position: relative;
+        }
+        
+        .password-toggle {
+            position: absolute;
+            top: 50%;
+            left: 15px;
+            transform: translateY(-50%);
+            z-index: 5;
         }
     </style>
 </head>
 <body>
-<div class="login-form container mt-5" style="max-width: 500px;">
-    <h2 class="text-center mb-4">تسجيل الدخول</h2>
+    <!-- خلفية النقاط المتحركة -->
+    <div id="particles-js"></div>
     
-    <!-- عرض رسائل الفلاش -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-    
-    <form method="POST" action="{{ url_for('login') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        
-        <div class="mb-3">
-            <label for="username" class="form-label">اسم المستخدم</label>
-            <input type="text" class="form-control" id="username" name="username" 
-                   required autofocus value="{{ request.form.username if request.form }}">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <h2><i class="fas fa-tasks"></i> نظام إدارة المهام</h2>
+            </div>
+            
+            <div class="login-body">
+                <!-- رسائل التنبيه -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <form method="POST" action="{{ url_for('login') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="mb-3">
+                        <label for="username" class="form-label">اسم المستخدم</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-user"></i></span>
+                            <input type="text" class="form-control" id="username" name="username" 
+                                   placeholder="أدخل اسم المستخدم" required autofocus>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="password" class="form-label">كلمة المرور</label>
+                        <div class="input-group password-container">
+                            <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                            <input type="password" class="form-control" id="password" name="password" 
+                                   placeholder="أدخل كلمة المرور" required>
+                            <button type="button" class="toggle-password" id="togglePassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid mb-3">
+                        <button type="submit" class="btn btn-login text-white">
+                            <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
+                        </button>
+                    </div>
+                    
+                    
+                </form>
+            </div>
+            
+            <div class="login-footer">
+                <p class="mb-0">جميع الحقوق محفوظة &copy; <span id="year"></span></p>
+            </div>
         </div>
-        
-        <div class="mb-3">
-            <label for="password" class="form-label">كلمة المرور</label>
-            <input type="password" class="form-control" id="password" name="password" required>
-        </div>
-        
-        <div class="d-grid gap-2">
-            <button type="submit" class="btn btn-primary btn-lg">
-                <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
-            </button>
-        </div>
-    </form>
-    
+    </div>
 
-</div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- مكتبة particles.js -->
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // تهيئة particles.js مع تفاعل متقدم مع الماوس
+            particlesJS('particles-js', {
+                "particles": {
+                    "number": {
+                        "value": 150,
+                        "density": {
+                            "enable": true,
+                            "value_area": 800
+                        }
+                    },
+                    "color": {
+                        "value": "#ffffff"
+                    },
+                    "shape": {
+                        "type": "circle",
+                        "stroke": {
+                            "width": 0,
+                            "color": "#000000"
+                        }
+                    },
+                    "opacity": {
+                        "value": 0.8,
+                        "random": true,
+                        "anim": {
+                            "enable": true,
+                            "speed": 0.5,
+                            "opacity_min": 0.1,
+                            "sync": false
+                        }
+                    },
+                    "size": {
+                        "value": 3,
+                        "random": true,
+                        "anim": {
+                            "enable": true,
+                            "speed": 2,
+                            "size_min": 0.1,
+                            "sync": false
+                        }
+                    },
+                    "line_linked": {
+                        "enable": true,
+                        "distance": 100,
+                        "color": "#ffffff",
+                        "opacity": 0.2,
+                        "width": 1
+                    },
+                    "move": {
+                        "enable": true,
+                        "speed": 0.3,
+                        "direction": "none",
+                        "random": true,
+                        "straight": false,
+                        "out_mode": "out",
+                        "bounce": false,
+                        "attract": {
+                            "enable": true,
+                            "rotateX": 600,
+                            "rotateY": 1200
+                        }
+                    }
+                },
+                "interactivity": {
+                    "detect_on": "window",
+                    "events": {
+                        "onhover": {
+                            "enable": true,
+                            "mode": "bubble"
+                        },
+                        "onclick": {
+                            "enable": true,
+                            "mode": "repulse"
+                        },
+                        "resize": true
+                    },
+                    "modes": {
+                        "bubble": {
+                            "distance": 200,
+                            "size": 0,
+                            "duration": 2,
+                            "opacity": 0,
+                            "speed": 3
+                        },
+                        "repulse": {
+                            "distance": 100,
+                            "duration": 0.4
+                        },
+                        "push": {
+                            "particles_nb": 4
+                        },
+                        "remove": {
+                            "particles_nb": 2
+                        }
+                    }
+                },
+                "retina_detect": true
+            });
+
+            // تأثير تتبع الماوس المتقدم
+            let mouseX = window.innerWidth / 2;
+            let mouseY = window.innerHeight / 2;
+            const particlesInstance = window.pJSDom[0].pJS;
+            
+            document.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+                
+                if (particlesInstance) {
+                    const particles = particlesInstance.particles.array;
+                    const attractionRadius = 200;
+                    const maxSpeed = 2;
+                    
+                    particles.forEach(p => {
+                        const dx = mouseX - p.x;
+                        const dy = mouseY - p.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance < attractionRadius) {
+                            const forceDirection = {
+                                x: dx / distance,
+                                y: dy / distance
+                            };
+                            const force = (attractionRadius - distance) / attractionRadius;
+                            
+                            // تطبيق قوة الجذب مع تحديد سرعة قصوى
+                            p.vx += forceDirection.x * force * maxSpeed;
+                            p.vy += forceDirection.y * force * maxSpeed;
+                            
+                            // تقليل سرعة الجسيمات القريبة لإنشاء تأثير تجمع
+                            if (distance < 100) {
+                                p.vx *= 0.7;
+                                p.vy *= 0.7;
+                            }
+                        }
+                    });
+                }
+            });
+
+            // خاصية إظهار/إخفاء كلمة المرور
+            const togglePassword = document.getElementById('togglePassword');
+            const passwordInput = document.getElementById('password');
+            
+            togglePassword.addEventListener('click', function() {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                
+                // تغيير الأيقونة
+                const icon = this.querySelector('i');
+                icon.classList.toggle('fa-eye');
+                icon.classList.toggle('fa-eye-slash');
+            });
+
+            // إضافة السنة الحالية
+            document.getElementById('year').textContent = new Date().getFullYear();
+            
+            // تأثيرات الحقول
+            document.querySelectorAll('.form-control').forEach(input => {
+                input.addEventListener('focus', function() {
+                    this.parentElement.querySelector('.input-group-text').style.borderColor = '#4e73df';
+                    this.parentElement.querySelector('.input-group-text').style.backgroundColor = '#e9f0ff';
+                });
+                
+                input.addEventListener('blur', function() {
+                    this.parentElement.querySelector('.input-group-text').style.borderColor = '#ddd';
+                    this.parentElement.querySelector('.input-group-text').style.backgroundColor = '#f8f9fa';
+                });
+            });
+        });
+    </script>
 </body>
 </html>

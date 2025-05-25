@@ -568,32 +568,33 @@
                                 <td>{{ task.department.name }}</td>
                                 <td>{{ task.employee.name }}</td>
                                 <td>
-                                    {% if can_edit_task(task) %}
-                                    <div class="status-dropdown">
-                                        <div class="status-badge status-update-btn d-flex align-items-center justify-content-between
-                                            {% if task.status == 'مكتمل' %}status-completed
-                                            {% elif task.status == 'قيد التنفيذ' %}status-in-progress
-                                            {% elif task.status == 'معلق' %}status-pending
-                                            {% elif task.status == 'ملغي' %}status-cancelled
-                                            {% endif %}
-                                            {% if task.is_overdue %} status-overdue {% endif %}"
-                                            onclick="toggleStatusMenu({{ task.id }}, event)">
-                                            <span>{{ task.status }}</span>
-                                            <i class="bi bi-chevron-down ms-1"></i>
-                                        </div>
-                                    </div>
-                                    {% else %}
-                                    <span class="status-badge 
-                                        {% if task.status == 'مكتمل' %}status-completed
-                                        {% elif task.status == 'قيد التنفيذ' %}status-in-progress
-                                        {% elif task.status == 'معلق' %}status-pending
-                                        {% elif task.status == 'ملغي' %}status-cancelled
-                                        {% endif %}
-                                        {% if task.is_overdue %}status-overdue{% endif %}">
-                                        {{ task.status }}
-                                    </span>
-                                    {% endif %}
-                                </td>
+    {% if can_edit_task(task) %}
+    <div class="status-dropdown">
+        <div class="status-badge status-update-btn d-flex align-items-center justify-content-between
+            {% if task.status == 'مكتمل' %}status-completed
+            {% elif task.status == 'قيد التنفيذ' %}status-in-progress
+            {% elif task.status == 'معلق' %}status-pending
+            {% elif task.status == 'ملغي' %}status-cancelled
+            {% endif %}
+            {% if task.is_overdue %} status-overdue {% endif %}"
+            onclick="toggleStatusMenu({{ task.id }}, event)"
+            data-task-id="{{ task.id }}">  <!-- أضف هذا السطر -->
+            <span>{{ task.status }}</span>
+            <i class="bi bi-chevron-down ms-1"></i>
+        </div>
+    </div>
+    {% else %}
+    <span class="status-badge 
+        {% if task.status == 'مكتمل' %}status-completed
+        {% elif task.status == 'قيد التنفيذ' %}status-in-progress
+        {% elif task.status == 'معلق' %}status-pending
+        {% elif task.status == 'ملغي' %}status-cancelled
+        {% endif %}
+        {% if task.is_overdue %}status-overdue{% endif %}">
+        {{ task.status }}
+    </span>
+    {% endif %}
+</td>
                                 <td>
                                     <div class="d-flex flex-column">
                                         <span>{{ task.date.strftime('%Y-%m-%d') }}</span>
@@ -734,103 +735,79 @@
         
         // دالة لإظهار القائمة المنسدلة
         function toggleStatusMenu(taskId, event) {
-            event.stopPropagation();
+    event.stopPropagation();
+    
+    // تأكد من أن taskId صحيح
+    if (!taskId || taskId === 0) {
+        console.error("Invalid task ID:", taskId);
+        return;
+    }
+    
+    const floatingMenu = document.getElementById('floating-status-menu');
+    
+    // إذا كانت القائمة مفتوحة لنفس المهمة، أغلقها
+    if (floatingMenu.style.display === 'block' && currentTaskId === taskId) {
+        floatingMenu.style.display = 'none';
+        currentTaskId = null;
+        return;
+    }
+    
+    currentTaskId = taskId;
+    
+    floatingMenu.innerHTML = `
+        <form id="statusForm" action="/update_status/${taskId}" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="status" id="statusInput">
             
-            const floatingMenu = document.getElementById('floating-status-menu');
+            <button type="button" class="status-item" onclick="updateStatus('قيد التنفيذ')">
+                <div class="status-badge status-in-progress">قيد التنفيذ</div>
+            </button>
             
-            // إذا كانت القائمة مفتوحة بالفعل لنفس المهمة، أغلقها
-            if (floatingMenu.style.display === 'block' && currentTaskId === taskId) {
-                floatingMenu.style.display = 'none';
-                currentTaskId = null;
-                return;
-            }
+            <button type="button" class="status-item" onclick="updateStatus('مكتمل')">
+                <div class="status-badge status-completed">مكتمل</div>
+            </button>
             
-            // تحديث المهمة الحالية
-            currentTaskId = taskId;
+            <button type="button" class="status-item" onclick="updateStatus('معلق')">
+                <div class="status-badge status-pending">معلق</div>
+            </button>
             
-            // إنشاء محتوى القائمة
-            floatingMenu.innerHTML = `
-                <form id="statusForm${taskId}" action="{{ url_for('update_status', task_id=0) }}".replace('0', taskId) method="post">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    
-                    <button type="button" class="status-item" onclick="updateStatus(${taskId}, 'قيد التنفيذ')">
-                        <div class="status-badge status-in-progress">قيد التنفيذ</div>
-                    </button>
-                    
-                    <button type="button" class="status-item" onclick="updateStatus(${taskId}, 'مكتمل')">
-                        <div class="status-badge status-completed">مكتمل</div>
-                    </button>
-                    
-                    <button type="button" class="status-item" onclick="updateStatus(${taskId}, 'معلق')">
-                        <div class="status-badge status-pending">معلق</div>
-                    </button>
-                    
-                    <button type="button" class="status-item" onclick="updateStatus(${taskId}, 'ملغي')">
-                        <div class="status-badge status-cancelled">ملغي</div>
-                    </button>
-                    
-                    <input type="hidden" id="statusInput${taskId}" name="status" value="">
-                </form>
-            `;
-            
-            // الحصول على موقع الزر الذي تم النقر عليه
-            const button = event.currentTarget;
-            const rect = button.getBoundingClientRect();
-            
-            // تحديد موقع القائمة المنسدلة بناءً على موقع الزر
-            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-            const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-            
-            // تحديد موقع القائمة المنسدلة بالنسبة للصفحة بأكملها
-            floatingMenu.style.top = (rect.bottom + scrollTop) + 'px';
-            
-            // تحديد موقع القائمة المنسدلة بالنسبة للجانب الأيمن (RTL)
-            floatingMenu.style.right = (document.documentElement.clientWidth - rect.right - scrollLeft) + 'px';
-            
-            // إظهار القائمة
-            floatingMenu.style.display = 'block';
-            
-            // إضافة مستمع حدث للنقر خارج القائمة لإغلاقها
-            setTimeout(() => {
-                document.addEventListener('click', closeStatusMenu);
-            }, 0);
-        }
-        
-        // دالة لإغلاق القائمة المنسدلة عند النقر في أي مكان آخر
-        function closeStatusMenu(event) {
-            const floatingMenu = document.getElementById('floating-status-menu');
-            
-            if (!floatingMenu.contains(event.target) && 
-                !event.target.classList.contains('status-update-btn') && 
-                !event.target.closest('.status-update-btn')) {
-                floatingMenu.style.display = 'none';
-                document.removeEventListener('click', closeStatusMenu);
-                currentTaskId = null;
-            }
-        }
+            <button type="button" class="status-item" onclick="updateStatus('ملغي')">
+                <div class="status-badge status-cancelled">ملغي</div>
+            </button>
+        </form>
+    `;
+    
+    const button = event.currentTarget;
+    const rect = button.getBoundingClientRect();
+    
+    floatingMenu.style.top = (rect.bottom + window.scrollY) + 'px';
+    floatingMenu.style.right = (window.innerWidth - rect.right - window.scrollX) + 'px';
+    floatingMenu.style.display = 'block';
+    
+    setTimeout(() => {
+        document.addEventListener('click', closeStatusMenu);
+    }, 0);
+}
         
         // دالة لتحديث حالة المهمة
-        function updateStatus(taskId, status) {
-            const statusInput = document.getElementById(`statusInput${taskId}`);
-            statusInput.value = status;
-            
-            const form = document.getElementById(`statusForm${taskId}`);
-            form.submit();
-            
-            // إغلاق القائمة المنسدلة
-            const floatingMenu = document.getElementById('floating-status-menu');
-            floatingMenu.style.display = 'none';
-            document.removeEventListener('click', closeStatusMenu);
-            currentTaskId = null;
-        }
-        
-        // تنفيذ الدوال عند تحميل الصفحة
-        document.addEventListener('DOMContentLoaded', function() {
-            formatRelativeTime();
-            
-            // تحديث الوقت النسبي كل دقيقة
-            setInterval(formatRelativeTime, 60000);
-        });
+        function updateStatus(status) {
+    if (!currentTaskId || currentTaskId === 0) {
+        console.error("No task ID selected");
+        return;
+    }
+    
+    const form = document.getElementById('statusForm');
+    const statusInput = document.getElementById('statusInput');
+    statusInput.value = status;
+    
+    form.submit();
+    
+    // إغلاق القائمة
+    const floatingMenu = document.getElementById('floating-status-menu');
+    floatingMenu.style.display = 'none';
+    document.removeEventListener('click', closeStatusMenu);
+    currentTaskId = null;
+}
         // دالة التصدير إلى إكسل (المعدلة لتصدير المهام المفلترة فقط)
             function exportFilteredTasks() {
                 // الحصول على معاملات التصفية الحالية من URL

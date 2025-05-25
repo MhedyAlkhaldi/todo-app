@@ -164,6 +164,8 @@ class ArchivedTask(db.Model):
     date = db.Column(db.Date)
     description = db.Column(db.Text)
     
+    archived_at = db.Column(db.DateTime, default=datetime.utcnow)  # مهم لتسجيل وقت الأرشفة
+    
     
 class Notification(db.Model):
     __tablename__ = 'notification'
@@ -699,10 +701,32 @@ def update_status(task_id):
         return redirect(url_for('dashboard'))
     
     new_status = request.form.get('status')
+    
     if new_status:
         task.status = new_status
-        db.session.commit()
-        flash('تم تحديث حالة المهمة بنجاح', 'success')
+        
+        if new_status == 'مكتمل':
+            try:
+                archived_task = ArchivedTask(
+                    task_name=task.task_name,
+                    description=task.description,
+                    date=task.date,
+                    status=new_status,  # استخدم الحالة الجديدة
+                    employee_id=task.employee_id,
+                    department_id=task.department_id,
+                    # archived_at سيتم تعبئته تلقائياً
+                )
+                
+                db.session.add(archived_task)
+                db.session.delete(task)
+                db.session.commit()
+                flash('تم تحديث حالة المهمة ونقلها إلى الأرشيف بنجاح', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'حدث خطأ أثناء أرشفة المهمة: {str(e)}', 'danger')
+        else:
+            db.session.commit()
+            flash('تم تحديث حالة المهمة بنجاح', 'success')
     
     return redirect(url_for('dashboard'))
 
@@ -730,21 +754,80 @@ def delete_task(task_id):
 @app.route('/archived_tasks')
 @login_required
 def archived_tasks():
-    # بناء الاستعلام الأساسي
+    # جلب البيانات الأساسية للفلاتر
+    departments = Department.query.all() if (is_admin() or current_user.is_hr) else []
+    employees = Employee.query.all() if (is_admin() or current_user.is_hr) else []
+    
+    # معالجة الفلاتر من الطلب
+    department_filter = request.args.get('department')
+    employee_filter = request.args.get('employee')
+    week_filter = request.args.get('week')
+    date_filter = request.args.get('date_filter')
+    
+    # بناء الاستعلام الأساسي مع العلاقات
     query = ArchivedTask.query.options(
         db.joinedload(ArchivedTask.employee),
         db.joinedload(ArchivedTask.department)
     )
     
-    # تطبيق الفلاتر حسب دور المستخدم
-    if not is_admin():
-        query = query.filter_by(employee_id=current_user.id)
+    # تطبيق فلتر الصلاحيات
+    if not (is_admin() or current_user.is_hr):
+        query = query.filter(ArchivedTask.employee_id == current_user.id)
     
-    # جلب المهام المؤرشفة
-    archived = query.order_by(ArchivedTask.date.desc()).all()
+    # تطبيق الفلاتر المشتركة
+    if department_filter and department_filter.isdigit():
+        query = query.filter(ArchivedTask.department_id == int(department_filter))
     
-    return render_template('archived_tasks.html', archived_tasks=archived)
-
+    if employee_filter and employee_filter.isdigit() and (is_admin() or current_user.is_hr):
+        query = query.filter(ArchivedTask.employee_id == int(employee_filter))
+    
+    if date_filter:
+        try:
+            parsed_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
+            query = query.filter(ArchivedTask.date == parsed_date)
+        except ValueError:
+            pass
+    
+    if week_filter:
+        week_match = re.match(r"(\d{4})-W(\d{2})", week_filter)
+        if week_match:
+            year, week = int(week_match.group(1)), int(week_match.group(2))
+            try:
+                monday = datetime.strptime(f"{year}-W{week}-1", "%G-W%V-%u").date()
+                start = monday - timedelta(days=2)
+                end = start + timedelta(days=6)
+                query = query.filter(ArchivedTask.date.between(start, end))
+            except ValueError:
+                pass
+    
+    # جلب النتائج النهائية
+    tasks = query.order_by(ArchivedTask.archived_at.desc()).all()
+    
+    # تجهيز الإشعارات للعرض (نفس الكود من dashboard)
+    notifications = Notification.query.filter(
+        Notification.employee_id == current_user.id,
+        db.or_(
+            Notification.message.like('%متأخرة%'),
+            Notification.message.like('%تمت الإشارة إليك%')
+        )
+    ).options(db.joinedload(Notification.task)).all()
+    
+    notifications = sorted([
+        {
+            **n.__dict__,
+            'notification_type': 'overdue' if 'متأخرة' in n.message else 'tag'
+        }
+        for n in notifications
+        if not n.task or n.task.employee_id != current_user.id
+    ], key=lambda x: x['timestamp'], reverse=True)[:10]
+    
+    return render_template(
+        'archived_tasks.html',
+        tasks=tasks,
+        departments=departments,
+        employees=employees,
+        notifications=notifications
+    )
 
 @app.route('/export_tasks')
 @login_required
