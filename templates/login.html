@@ -159,6 +159,11 @@
             transform: translateY(-50%);
             z-index: 5;
         }
+        login-header img {
+            filter: brightness(0) invert(1); /* لجعل الشعار أبيض إذا كان الخلفية داكنة */
+            transition: transform 0.3s ease;
+        }
+
     </style>
 </head>
 <body>
@@ -168,8 +173,13 @@
     <div class="login-container">
         <div class="login-card">
             <div class="login-header">
-                <h2><i class="fas fa-tasks"></i> نظام إدارة المهام</h2>
+            <div class="d-flex align-items-center justify-content-center">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" 
+                    alt="شعار المنظمة" 
+                    style="height: 40px; margin-left: 15px;">
+                <h2 class="mb-0"><i class="fas fa-tasks"></i> نظام إدارة المهام</h2>
             </div>
+        </div>
             
             <div class="login-body">
                 <!-- رسائل التنبيه -->
@@ -219,7 +229,7 @@
             </div>
             
             <div class="login-footer">
-                <p class="mb-0">جميع الحقوق محفوظة &copy; <span id="year"></span></p>
+                <p class="mb-0">جميع الحقوق محفوظة لمنظمة دار &copy; <span id="year"></span></p>
             </div>
         </div>
     </div>
