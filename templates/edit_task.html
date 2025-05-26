@@ -350,18 +350,20 @@
 
                         <!-- معلومات الموظف والقسم -->
                         <div class="mb-4">
-                            <h5 class="section-title">معلومات التنفيذ</h5>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">الموظف</label>
-                                    <input type="text" class="form-control" value="{{ task.employee.name }}" readonly>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">القسم</label>
-                                    <input type="text" class="form-control" value="{{ task.department.name }}" readonly>
-                                </div>
-                            </div>
-                        </div>
+    <h5 class="section-title">معلومات التنفيذ</h5>
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label class="form-label">الموظف</label>
+            <input type="text" class="form-control" value="{{ task.employee.name }}" readonly>
+            <input type="hidden" name="employee_id" value="{{ task.employee.id }}">
+        </div>
+        <div class="col-md-6 mb-3">
+            <label class="form-label">القسم</label>
+            <input type="text" class="form-control" value="{{ task.department.name }}" readonly>
+            <input type="hidden" name="department_id" value="{{ task.department.id }}">
+        </div>
+    </div>
+</div>
 
                         <!-- حالة المهمة وتاريخها -->
                         <div class="mb-4">

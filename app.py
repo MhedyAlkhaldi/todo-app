@@ -574,15 +574,27 @@ def edit_task(task_id):
         return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
-        task.task_name = request.form.get('task_name')
-        task.department_id = request.form.get('department_id')
-        task.employee_id = request.form.get('employee_id')
-        task.status = request.form.get('status')
+        task_name = request.form.get('task_name')
+        department_id = request.form.get('department_id')
+        employee_id = request.form.get('employee_id')
+        status = request.form.get('status')
         date_str = request.form.get('date')
-        task.description = request.form.get('description')
+        description = request.form.get('description')
         
         # الحصول على قائمة الموظفين المشار إليهم (تاغ)
         tagged_employee_ids = request.form.getlist('tagged_employees')
+        
+        # التحقق من البيانات - إضافة تحقق من الحقول المطلوبة
+        if not task_name or not department_id or not employee_id or not status or not date_str:
+            flash('يرجى ملء جميع الحقول المطلوبة', 'danger')
+            return redirect(url_for('edit_task', task_id=task_id))
+        
+        # تحديث بيانات المهمة بعد التحقق من وجودها
+        task.task_name = task_name
+        task.department_id = department_id
+        task.employee_id = employee_id
+        task.status = status
+        task.description = description
         
         try:
             task.date = datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -627,6 +639,8 @@ def edit_task(task_id):
             return redirect(url_for('dashboard'))
         except Exception as e:
             db.session.rollback()
+            # إضافة تسجيل الخطأ للمساعدة في التشخيص
+            print(f"خطأ في تحديث المهمة: {str(e)}")
             flash('حدث خطأ أثناء تحديث المهمة', 'danger')
             return redirect(url_for('edit_task', task_id=task_id))
     
@@ -654,6 +668,7 @@ def edit_task(task_id):
         tag_employees=tag_employees,
         current_tagged_ids=current_tagged_ids
     )
+
 
 
 @app.route('/get_tagged_employees/<int:task_id>')
