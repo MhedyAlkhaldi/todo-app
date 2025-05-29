@@ -485,14 +485,16 @@
                             {% if is_admin() or current_user.is_hr %}
                             <div class="col-md-3">
                                 <label for="employee_filter" class="form-label">الموظف</label>
-                                <select class="form-select" id="employee_filter" name="employee_filter">
-                                    <option value="">جميع الموظفين</option>
-                                    {% for emp in all_employees %}
-                                        <option value="{{ emp.id }}" {% if employee_filter == emp.id|string %}selected{% endif %}>
-                                            {{ emp.name }}
-                                        </option>
-                                    {% endfor %}
-                                </select>
+                          <select class="form-select" id="employee_filter" name="employee_filter">
+                            <option value="">جميع الموظفين</option>
+                            {% for emp in all_employees %}
+                                <option value="{{ emp.id }}" 
+                                        data-department="{{ emp.department_id }}"
+                                        {% if employee_filter == emp.id|string %}selected{% endif %}>
+                                    {{ emp.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
                             </div>
                             {% else %}
                             <div class="col-md-3">
@@ -836,5 +838,45 @@
             
         
     </script>
+    <script>
+document.addEventListener('DOMContentLoaded', function() {
+    const departmentFilter = document.getElementById('department_filter');
+    const employeeFilter = document.getElementById('employee_filter');
+    
+    // عند تغيير فلتر القسم
+    departmentFilter.addEventListener('change', function() {
+        const selectedDeptId = this.value;
+        const employeeOptions = employeeFilter.querySelectorAll('option');
+        
+        // إظهار/إخفاء الموظفين بناءً على القسم المحدد
+        employeeOptions.forEach(option => {
+            if (option.value === "") {
+                // إبقاء خيار "جميع الموظفين" ظاهرًا دائمًا
+                option.style.display = '';
+            } else {
+                const empDeptId = option.getAttribute('data-department');
+                if (selectedDeptId === "" || empDeptId === selectedDeptId) {
+                    option.style.display = '';
+                } else {
+                    option.style.display = 'none';
+                }
+            }
+        });
+        
+        // إعادة تعيين قيمة الموظف المحدد إذا لم يكن متاحًا في القسم الجديد
+        if (employeeFilter.value !== "" && selectedDeptId !== "") {
+            const selectedOption = employeeFilter.querySelector(`option[value="${employeeFilter.value}"]`);
+            if (selectedOption && selectedOption.style.display === 'none') {
+                employeeFilter.value = "";
+            }
+        }
+    });
+    
+    // تنفيذ التصفية عند تحميل الصفحة إذا كان هناك قسم محدد
+    if (departmentFilter.value) {
+        departmentFilter.dispatchEvent(new Event('change'));
+    }
+});
+</script>
 </body>
 </html>
