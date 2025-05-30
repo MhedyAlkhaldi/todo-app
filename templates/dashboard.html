@@ -409,39 +409,49 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end notifications-dropdown">
                             <li class="notifications-header">الإشعارات</li>
-                            
-                            {% if notifications %}
-                                {% for notification in notifications %}
-                                <li>
-                                    <a href="{{ url_for('task_details', task_id=notification.task_id) }}" 
-                                       class="notification-item {% if not notification.is_read %}unread{% endif %}"
-                                       onclick="markNotificationRead({{ notification.id }}, event)">
-                                        <div class="notification-icon {% if notification.notification_type == 'overdue' %}overdue{% elif notification.notification_type == 'tag' %}tag{% endif %}">
-                                            {% if notification.notification_type == 'overdue' %}
-                                                <i class="bi bi-exclamation-triangle-fill"></i>
-                                            {% elif notification.notification_type == 'tag' %}
-                                                <i class="bi bi-at"></i>
-                                            {% else %}
-                                                <i class="bi bi-info-circle-fill"></i>
-                                            {% endif %}
-                                        </div>
-                                        <div class="notification-content">
-                                            <div class="notification-text">{{ notification.message }}</div>
-                                            <div class="notification-time" data-timestamp="{{ notification.timestamp.timestamp() }}">
-                                                {{ notification.timestamp.strftime('%Y-%m-%d %H:%M') }}
-                                            </div>
-                                        </div>
-                                    </a>
-                                </li>
-                                {% endfor %}
-                            {% else %}
-                                <li class="no-notifications">لا توجد إشعارات</li>
-                            {% endif %}
-                            
-                            <li class="notifications-footer">
-                                <a href="{{ url_for('notifications') }}">عرض جميع الإشعارات</a>
-                            </li>
-                        </ul>
+
+{% if notifications %}
+    {% for notification in notifications %}
+    <li>
+        {% if notification.task_id is not none %}  <!-- التحقق من وجود task_id -->
+            <a href="{{ url_for('task_details', task_id=notification.task_id) }}" 
+               class="notification-item {% if not notification.is_read %}unread{% endif %}"
+               onclick="markNotificationRead({{ notification.id }}, event)">
+        {% else %}
+            <div class="notification-item {% if not notification.is_read %}unread{% endif %}"
+                 onclick="markNotificationRead({{ notification.id }}, event)">
+        {% endif %}
+        
+                <div class="notification-icon {% if notification.notification_type == 'overdue' %}overdue{% elif notification.notification_type == 'tag' %}tag{% endif %}">
+                    {% if notification.notification_type == 'overdue' %}
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                    {% elif notification.notification_type == 'tag' %}
+                        <i class="bi bi-at"></i>
+                    {% else %}
+                        <i class="bi bi-info-circle-fill"></i>
+                    {% endif %}
+                </div>
+                <div class="notification-content">
+                    <div class="notification-text">{{ notification.message }}</div>
+                    <div class="notification-time" data-timestamp="{{ notification.timestamp.timestamp() }}">
+                        {{ notification.timestamp.strftime('%Y-%m-%d %H:%M') }}
+                    </div>
+                </div>
+        
+        {% if notification.task_id is not none %}
+            </a>
+        {% else %}
+            </div>
+        {% endif %}
+    </li>
+    {% endfor %}
+{% else %}
+    <li class="no-notifications">لا توجد إشعارات</li>
+{% endif %}
+
+<li class="notifications-footer">
+    <a href="{{ url_for('notifications') }}">عرض جميع الإشعارات</a>
+</li>
                     </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
