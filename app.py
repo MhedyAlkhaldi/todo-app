@@ -33,12 +33,10 @@ def inject_csrf_token():
 # ------------------------------
 def get_database_uri():
     uri = os.getenv('DATABASE_URL')
-    if not uri and 'railway' in os.getenv('PYTHON_VERSION', ''):
-        uri = "postgresql://postgres:gZAqNHnNEHRbrRDZQLoQqrGFLNKjWEHF@hopper.proxy.rlwy.net:10727/railway"
+    
     if uri and uri.startswith("postgres://"):
         uri = uri.replace("postgres://", "postgresql://", 1)
-    if uri and ('railway' in uri or 'supabase' in uri):
-        uri += "?sslmode=require" if '?' not in uri else "&sslmode=require"
+   
     return uri or 'sqlite:///local.db'
 
 app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
