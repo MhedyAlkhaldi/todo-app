@@ -13,7 +13,7 @@ postgresql://postgres:C_FKf4_uN.2fwH-@db.zidmmheurkweuwoasrfg.supabase.co:5432/t
 طريقة push على ريندر
 
 git add .
-git commit -m "Org chart"
+git commit -m "update task"
 git push
 
 C_FKf4_uN.2fwH-
@@ -25,5 +25,13 @@ git commit -m "تسجيل الدخول وصلاحيات العرض3"
 postgresql://postgres:gZAqNHnNEHRbrRDZQLoQqrGFLNKjWEHF@hopper.proxy.rlwy.net:10727/railway
 
 الترحيل
-flask db migrate -m "Initial migration"
+flask db migrate -m "HR view"
 flask db upgrade
+
+
+
+
+Neon
+postgresql://neondb_owner:npg_f9kcJKG7WpoX@ep-cool-union-a9m0lzyb-pooler.gwc.azure.neon.tech/neondb?sslmode=require
+
+Pass:npg_f9kcJKG7WpoX@ep
